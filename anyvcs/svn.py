@@ -21,7 +21,7 @@ class SvnRepo(VCSRepo):
 
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path]
-    output = self._command(cmd).rstrip('\n')
+    output = self._command(cmd)
     return [x.strip() for x in output.splitlines()]
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
@@ -53,7 +53,6 @@ class SvnRepo(VCSRepo):
       if p.returncode == 1 and 'File not found' in stderr:
         raise PathDoesNotExist(rev, path)
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
-    output = output.rstrip('\n')
 
     results = []
     lines = output.splitlines()

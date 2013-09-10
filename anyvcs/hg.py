@@ -39,7 +39,7 @@ class HgRepo(VCSRepo):
       prefix = path + '/'
 
     cmd = [HG, 'manifest', '-v', '-r', rev]
-    output = self._command(cmd).rstrip('\n')
+    output = self._command(cmd)
     dirs = set()
     results = []
     for line in output.splitlines():
@@ -109,7 +109,7 @@ class HgRepo(VCSRepo):
     return self._readlink(rev, path)
 
   def _parse_heads(self, cmd):
-    output = self._command(cmd).rstrip('\n')
+    output = self._command(cmd)
     results = []
     for line in output.splitlines():
       m = parse_heads_rx.match(line)
@@ -127,8 +127,8 @@ class HgRepo(VCSRepo):
 
   def bookmarks(self):
     cmd = [HG, 'bookmarks']
-    output = self._command(cmd).rstrip('\n')
-    if output == 'no bookmarks set':
+    output = self._command(cmd)
+    if output.startswith('no bookmarks set'):
       return []
     results = []
     for line in output.splitlines():

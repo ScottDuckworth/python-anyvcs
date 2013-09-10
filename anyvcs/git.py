@@ -108,7 +108,7 @@ class GitRepo(VCSRepo):
 
   def branches(self):
     cmd = [GIT, 'branch']
-    output = self._command(cmd).rstrip('\n')
+    output = self._command(cmd)
     results = []
     for line in output.splitlines():
       m = branch_rx.match(line)
@@ -118,7 +118,7 @@ class GitRepo(VCSRepo):
 
   def tags(self):
     cmd = [GIT, 'tag']
-    output = self._command(cmd).rstrip('\n')
+    output = self._command(cmd)
     return output.splitlines()
 
   def heads(self):
