@@ -33,7 +33,7 @@ class GitTest(unittest.TestCase):
     for message in cls.setUpWorkingCopy(working_path):
       check_call(['git', 'add', '.'], cwd=working_path)
       check_call(['git', 'commit', '-m', message], cwd=working_path)
-    check_call(['git', 'push'], cwd=working_path)
+    check_call(['git', 'push', 'origin', 'master'], cwd=working_path)
 
   @classmethod
   def tearDownClass(cls):
@@ -75,7 +75,7 @@ class SvnTest(unittest.TestCase):
         del fnames[fnames.index('.svn')]
       for fname in fnames:
         p = os.path.join(dirname, fname)
-        check_call(['svn', 'add', '-q', p], cwd=top)
+        check_call(['svn', 'add', '-q', '--force', p], cwd=top)
         st = os.lstat(os.path.join(top, p))
         if stat.S_ISREG(st.st_mode) and stat.S_IXUSR & st.st_mode:
           check_call(['svn', 'propset', 'svn:executable', 'yes', p], cwd=top)
