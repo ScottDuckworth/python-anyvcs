@@ -171,8 +171,8 @@ class SvnRepo(VCSRepo):
   def heads(self):
     return ['HEAD'] + self._heads(('branches', 'tags'))
 
-  def log(self, revrange=None, path=None, follow=False, firstparent=False,
-          branchlog=False, limit=None):
+  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
+          merges=None, path=None, follow=False):
     if revrange is None:
       revrange = (None, None)
     if isinstance(revrange, tuple):
