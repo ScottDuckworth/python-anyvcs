@@ -5,6 +5,8 @@ from common import *
 SVNADMIN = 'svnadmin'
 SVNLOOK = 'svnlook'
 
+head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
+
 class SvnRepo(VCSRepo):
   @classmethod
   def create(cls, path):
@@ -24,9 +26,26 @@ class SvnRepo(VCSRepo):
     output = self._command(cmd)
     return [x.strip() for x in output.splitlines()]
 
+  def _maprev(self, rev, path):
+    if isinstance(rev, int):
+      return (rev, path)
+    m = head_rev_rx.match(rev)
+    assert m, 'invalid rev'
+    head, rev = m.group('head', 'rev')
+    if rev:
+      rev = int(rev)
+    else:
+      rev = self.youngest()
+    if head is None:
+      return (rev, path)
+    elif head == 'HEAD':
+      return (rev, path)
+    else:
+      return (rev, '/' + head + '/' + path)
+
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
-    rev = type(self).cleanRev(rev)
+    rev, path = self._maprev(rev, path)
     path = type(self).cleanPath(path)
     forcedir = False
     if path.endswith('/'):
@@ -42,7 +61,7 @@ class SvnRepo(VCSRepo):
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [SVNLOOK, 'tree', '-r', rev, '--full-paths']
+    cmd = [SVNLOOK, 'tree', '-r', str(rev), '--full-paths']
     if not recursive:
       cmd.append('--non-recursive')
     cmd.extend(['.', path])
@@ -72,9 +91,9 @@ class SvnRepo(VCSRepo):
         entry.type = 'd'
         entry_name = entry_name.rstrip('/')
       else:
-        proplist = self._proplist(rev, name)
+        proplist = self._proplist(str(rev), name)
         if 'svn:special' in proplist:
-          link = self._cat(rev, name).split(None, 1)
+          link = self._cat(str(rev), name).split(None, 1)
           if len(link) == 2 and link[0] == 'link':
             entry.type = 'l'
             if 'target' in report:
@@ -84,7 +103,7 @@ class SvnRepo(VCSRepo):
           if 'executable' in report:
             entry.executable = 'svn:executable' in proplist
           if 'size' in report:
-            entry.size = len(self._cat(rev, name))
+            entry.size = len(self._cat(str(rev), name))
       if entry_name:
         entry.name = entry_name
       results.append(entry)
@@ -95,13 +114,13 @@ class SvnRepo(VCSRepo):
     return self._command(cmd)
 
   def cat(self, rev, path):
-    rev = type(self).cleanRev(rev)
+    rev, path = self._maprev(rev, path)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'f':
       raise BadFileType(rev, path)
-    return self._cat(rev, path)
+    return self._cat(str(rev), path)
 
   def _readlink(self, rev, path):
     output = self._cat(rev, path)
@@ -110,13 +129,13 @@ class SvnRepo(VCSRepo):
     return link[1]
 
   def readlink(self, rev, path):
-    rev = type(self).cleanRev(rev)
+    rev, path = self._maprev(rev, path)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'l':
       raise BadFileType(rev, path)
-    return self._readlink(rev, path)
+    return self._readlink(str(rev), path)
 
   def youngest(self):
     cmd = [SVNLOOK, 'youngest', '.']
