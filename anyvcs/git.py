@@ -121,8 +121,8 @@ class GitRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags()
 
-  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
-          merges=None, path=None, follow=False):
+  def log(self, revrange=None, limit=None, firstparent=False, merges=None,
+          path=None, follow=False):
     cmd = [GIT, 'log', '--pretty=format:%H%n:%P%n%ai%n%an <%ae>%n:%s%n%n']
     if limit is not None:
       cmd.append('-' + str(limit))
@@ -133,6 +133,7 @@ class GitRepo(VCSRepo):
         cmd.append('--merges')
       else:
         cmd.append('--no-merges')
+    single = False
     if revrange is None:
       pass
     elif isinstance(revrange, tuple):
@@ -148,6 +149,7 @@ class GitRepo(VCSRepo):
           cmd.append(revrange[0] + '..' + revrange[1])
     else:
       cmd.extend(['-1', revrange])
+      single = True
     if path:
       if follow:
         cmd.append('--follow')
@@ -160,7 +162,10 @@ class GitRepo(VCSRepo):
       parents = parents[1:].split()
       date = parse_isodate(date)
       subject = subject[1:]
-      results.append(CommitLogEntry(rev, parents, date, author, subject))
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      if single:
+        return entry
+      results.append(entry)
     return results
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):

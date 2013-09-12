@@ -68,12 +68,11 @@ class VCSTest(unittest.TestCase):
     shutil.rmtree(cls.dir)
 
   def assertCommitLogEqual(self, a, b):
-    for a_i, b_i in zip(a, b):
-      self.assertEqual(a_i.rev, b_i.rev)
-      self.assertEqual(a_i.parents, b_i.parents)
-      self.assertEqual(normalize_datetime(a_i.date), normalize_datetime(b_i.date), '%s != %s' % (a_i.date, b_i.date))
-      self.assertEqual(a_i.author, b_i.author)
-      self.assertEqual(a_i.subject, b_i.subject)
+    self.assertEqual(a.rev, b.rev)
+    self.assertEqual(a.parents, b.parents)
+    self.assertEqual(normalize_datetime(a.date), normalize_datetime(b.date), '%s != %s' % (a.date, b.date))
+    self.assertEqual(a.author, b.author)
+    self.assertEqual(a.subject, b.subject)
 
 class GitTest(VCSTest):
   head = 'master'
@@ -366,34 +365,38 @@ class BasicTest(object):
     self.assertRaises(BadFileType, self.repo.readlink, self.head, '/c')
 
   def test_log1(self):
-    result = self.repo.log()
-    correct = self.commits
-    self.assertGreaterEqual(len(result), len(correct))
+    result = self.repo.log(revrange=self.head)
+    correct = self.commits[0]
+    self.assertIsInstance(result, CommitLogEntry)
     self.assertCommitLogEqual(result, correct)
 
   def test_log2(self):
-    result = self.repo.log(revrange=self.head)
-    correct = self.commits[0:1]
-    self.assertEqual(len(result), 1)
-    self.assertCommitLogEqual(result, correct)
+    result = self.repo.log()
+    correct = self.commits
+    self.assertGreaterEqual(len(result), len(correct))
+    for result_i, correct_i in zip(result, correct):
+      self.assertCommitLogEqual(result_i, correct_i)
 
   def test_log3(self):
     result = self.repo.log(revrange=(self.zerocommit, None))
     correct = self.commits
     self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-    self.assertCommitLogEqual(result, correct)
+    for result_i, correct_i in zip(result, correct):
+      self.assertCommitLogEqual(result_i, correct_i)
 
   def test_log4(self):
     result = self.repo.log(revrange=(self.zerocommit, self.head))
     correct = self.commits
     self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-    self.assertCommitLogEqual(result, correct)
+    for result_i, correct_i in zip(result, correct):
+      self.assertCommitLogEqual(result_i, correct_i)
 
   def test_log5(self):
     result = self.repo.log(limit=1)
     correct = self.commits[0:1]
     self.assertEqual(len(result), 1)
-    self.assertCommitLogEqual(result, correct)
+    for result_i, correct_i in zip(result, correct):
+      self.assertCommitLogEqual(result_i, correct_i)
 
 
 class BasicGitTest(GitTest, BasicTest):

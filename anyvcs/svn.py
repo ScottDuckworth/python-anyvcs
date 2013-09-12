@@ -171,10 +171,11 @@ class SvnRepo(VCSRepo):
   def heads(self):
     return ['HEAD'] + self._heads(('branches', 'tags'))
 
-  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
-          merges=None, path=None, follow=False):
+  def log(self, revrange=None, limit=None, firstparent=False, merges=None,
+          path=None, follow=False):
     if revrange is None:
       revrange = (None, None)
+    single = False
     if isinstance(revrange, tuple):
       if revrange[0] is None:
         startrev = None
@@ -203,6 +204,7 @@ class SvnRepo(VCSRepo):
         revs.append(rev)
     else:
       revs = [int(revrange)]
+      single = True
 
     results = []
     for rev in revs:
@@ -216,6 +218,8 @@ class SvnRepo(VCSRepo):
       date = parse_isodate(date)
       subject = message.split('\n', 1)[0]
       entry = CommitLogEntry(rev, parents, date, author, subject)
+      if single:
+        return entry
       results.append(entry)
     return results
 

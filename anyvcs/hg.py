@@ -138,8 +138,8 @@ class HgRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags() + self.bookmarks()
 
-  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
-          merges=None, path=None, follow=False):
+  def log(self, revrange=None, limit=None, firstparent=False, merges=None,
+          path=None, follow=False):
     cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n:{desc|firstline}\n\n']
     if limit is not None:
       cmd.append('-l' + str(limit))
@@ -150,7 +150,7 @@ class HgRepo(VCSRepo):
         cmd.append('--only-merges')
       else:
         cmd.append('--no-merges')
-    trimlast = False
+    single = False
     if revrange is None:
       pass
     elif isinstance(revrange, tuple):
@@ -163,13 +163,10 @@ class HgRepo(VCSRepo):
         if revrange[1] is None:
           cmd.extend(['-r', 'reverse(descendants(%s))' % revrange[0]])
         else:
-          if branchlog:
-            cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1], '--prune', str(revrange[0])])
-          else:
-            cmd.extend(['-r', 'reverse(%s..%s)' % (revrange[0], revrange[1])])
-            trimlast = True
+          cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1], '--prune', str(revrange[0])])
     else:
       cmd.extend(['-r', str(revrange)])
+      single = True
     if path:
       if follow:
         cmd.append('--follow')
@@ -177,11 +174,7 @@ class HgRepo(VCSRepo):
     output = self._command(cmd)
 
     results = []
-    logs = output.split('\n\n')
-    if trimlast:
-      logs = logs[:-2]
-    else:
-      logs = logs[:-1]
+    logs = output.split('\n\n')[:-1]
     for log in logs:
       rev, parents, date, author, subject = log.split('\n', 4)
       parents = [x[1] for x in filter(lambda x: x[0] != '-1',
@@ -190,7 +183,10 @@ class HgRepo(VCSRepo):
       date = datetime.datetime.fromtimestamp(float(ts))
       date = date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
       subject = subject[1:]
-      results.append(CommitLogEntry(rev, parents, date, author, subject))
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      if single:
+        return entry
+      results.append(entry)
     return results
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
