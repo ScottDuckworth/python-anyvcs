@@ -22,9 +22,29 @@ class SvnRepo(VCSRepo):
     return path
 
   def _proplist(self, rev, path):
-    cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path]
+    cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
     output = self._command(cmd)
     return [x.strip() for x in output.splitlines()]
+
+  def proplist(self, rev, path=None):
+    rev, prefix = self._maprev(rev)
+    if path is None:
+      return self._proplist(rev, None)
+    else:
+      path = type(self).cleanPath(prefix + path)
+      return self._proplist(rev, path)
+
+  def _propget(self, rev, path):
+    cmd = [SVNLOOK, 'propget', '-r', rev, '.', path or '--revprop']
+    return self._command(cmd)
+
+  def propget(self, rev, path=None):
+    rev, prefix = self._maprev(rev)
+    if path is None:
+      return self._propget(rev, None)
+    else:
+      path = type(self).cleanPath(prefix + path)
+      return self._propget(rev, path)
 
   def _maprev(self, rev):
     if isinstance(rev, int):
