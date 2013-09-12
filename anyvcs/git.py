@@ -123,3 +123,43 @@ class GitRepo(VCSRepo):
 
   def heads(self):
     return self.branches() + self.tags()
+
+  def log(self, revrange=None, path=None, follow=False, followfirst=False,
+          prune=None, limit=None):
+    cmd = [GIT, 'log', '--pretty=format:%H%n:%P%n%ai%n%an <%ae>%n:%s%n%n']
+    if limit is not None:
+      cmd.append('-' + str(limit))
+    if follow:
+      cmd.append('--follow')
+    if followfirst:
+      cmd.append('--first-parent')
+    if revrange is None:
+      pass
+    elif isinstance(revrange, tuple):
+      if revrange[0] is None:
+        if revrange[1] is None:
+          pass
+        else:
+          cmd.append(revrange[1])
+      else:
+        if revrange[1] is None:
+          cmd.append(revrange[0] + '..')
+        else:
+          cmd.append(revrange[0] + '..' + revrange[1])
+    else:
+      cmd.extend(['-1', revrange])
+    if path:
+      cmd.extend(['--', type(self).cleanPath(path)])
+    output = self._command(cmd)
+
+    results = []
+    for log in output.split('\n\n')[:-1]:
+      rev, parents, date, author, subject = log.split('\n', 4)
+      parents = parents[1:].split()
+      date = parse_isodate(date)
+      subject = subject[1:]
+      results.append(CommitLogEntry(rev, parents, date, author, subject))
+    return results
+
+  def diff(self, rev_a, rev_b, path_a, path_b=None):
+    raise NotImplementedError

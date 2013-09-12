@@ -1,8 +1,20 @@
+import datetime
 import re
 import subprocess
 from abc import ABCMeta, abstractmethod
 
 multislash_rx = re.compile(r'//+')
+isodate_rx = re.compile(r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\s+(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{1,2})\s+(?P<tz>[+-]?\d{4})')
+
+def parse_isodate(datestr):
+  m = isodate_rx.search(datestr)
+  assert m, 'unrecognized date format: ' + datestr
+  date = datetime.datetime(*[int(x) for x in m.group('year', 'month', 'day', 'hour', 'minute', 'second')])
+  tz = m.group('tz')
+  offset = datetime.timedelta(minutes=int(tz[-2:]), hours=int(tz[-4:-2]))
+  if tz[0] == '-':
+    offset = -offset
+  return date.replace(tzinfo=UTCOffset(offset))
 
 class UnknownVCSType(Exception):
   pass
@@ -24,6 +36,44 @@ class attrdict(dict):
     self.__setitem__(name, value)
   def __delattr__(self, name):
     self.__delitem__(name)
+
+class CommitLogEntry(object):
+  def __init__(self, rev, parents, date, author, subject):
+    self.rev = rev
+    self.parents = parents
+    self.date = date
+    self.author = author
+    self.subject = subject
+
+  def __str__(self):
+    return str(self.rev)
+
+  def __repr__(self):
+    return str('<%s.%s %s>' % (type(self).__module__, type(self).__name__, self.rev))
+
+class UTCOffset(datetime.tzinfo):
+  ZERO = datetime.timedelta()
+
+  def __init__(self, offset, name=None):
+    if isinstance(offset, datetime.timedelta):
+      self.offset = offset
+    else:
+      self.offset = datetime.timedelta(minutes=offset)
+    if name is not None:
+      self.name = name
+    elif self.offset < type(self).ZERO:
+      self.name = '-%02d%02d' % divmod((-self.offset).seconds/60, 60)
+    else:
+      self.name = '+%02d%02d' % divmod(self.offset.seconds/60, 60)
+
+  def utcoffset(self, dt):
+    return self.offset
+
+  def dst(self, dt):
+    return type(self).ZERO
+
+  def tzname(self, dt):
+    return self.name
 
 class VCSRepo(object):
   __metaclass__ = ABCMeta
@@ -126,4 +176,29 @@ class VCSRepo(object):
   def heads(self):
     """Get list of heads
     """
+    raise NotImplementedError
+
+  @abstractmethod
+  def log(self, revrange=None, path=None, follow=False, followfirst=False,
+          prune=None, limit=None):
+    """Get commit log
+
+    Arguments:
+    revrange     Range of revisions as a 2-tuple (start,end) or end revision.
+                 Start revision is non-inclusive, end revision is inclusive.
+                 Start may be None, meaning the beginning of history. End may
+                 be None, meaning the end of history.
+    path         Only match commits containing changes on this path.
+    follow       Follow file history across renames.
+    followfirst  Only follow the first parent of merges.
+    prune        Do not display this revision or any of its ancestors.
+    limit        Limit the number of log entries.
+
+    Returns a list of CommitLogEntry objects in reverse chronological order.
+
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError

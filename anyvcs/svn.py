@@ -151,3 +151,59 @@ class SvnRepo(VCSRepo):
 
   def heads(self):
     return ['HEAD'] + self._heads(('branches', 'tags'))
+
+  def log(self, revrange=None, path=None, follow=False, followfirst=False,
+          prune=None, limit=None):
+    if revrange is None:
+      revrange = (None, None)
+    if isinstance(revrange, tuple):
+      if revrange[0] is None:
+        if prune is None:
+          startrev = None
+        else:
+          startrev = prune
+      else:
+        startrev = int(revrange[0])
+        if prune is not None:
+          startrev = max(startrev, int(prune))
+      if revrange[1] is None:
+        endrev = self.youngest()
+      else:
+        endrev = int(revrange[1])
+      cmd = [SVNLOOK, 'history', '.', '-r', str(endrev)]
+      if limit is not None:
+        cmd.extend(['-l', str(limit)])
+      elif startrev is not None:
+        cmd.extend(['-l', str(endrev - startrev)])
+      output = self._command(cmd)
+
+      revs = []
+      consume = endrev is None
+      for line in output.splitlines()[2:]:
+        rev = int(line.split()[0])
+        if not consume and rev != endrev:
+          continue
+        consume = True
+        if rev == startrev:
+          break
+        revs.append(rev)
+    else:
+      revs = [int(revrange)]
+
+    results = []
+    for rev in revs:
+      cmd = [SVNLOOK, 'info', '.', '-r', str(rev)]
+      output = self._command(cmd)
+      author, date, logsize, message = output.split('\n', 3)
+      if rev == 0:
+        parents = []
+      else:
+        parents = [rev - 1]
+      date = parse_isodate(date)
+      subject = message.split('\n', 1)[0]
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      results.append(entry)
+    return results
+
+  def diff(self, rev_a, rev_b, path_a, path_b=None):
+    raise NotImplementedError

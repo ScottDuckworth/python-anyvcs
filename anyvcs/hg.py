@@ -1,3 +1,4 @@
+import datetime
 import re
 import subprocess
 from common import *
@@ -139,3 +140,46 @@ class HgRepo(VCSRepo):
 
   def heads(self):
     return self.branches() + self.tags() + self.bookmarks()
+
+  def log(self, revrange=None, path=None, follow=False, followfirst=False,
+          prune=None, limit=None):
+    cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n:{desc|firstline}\n\n']
+    if limit is not None:
+      cmd.append('-l' + str(limit))
+    if follow:
+      cmd.append('--follow')
+    if followfirst:
+      cmd.append('--follow-first')
+    if revrange is None:
+      pass
+    elif isinstance(revrange, tuple):
+      if revrange[0] is None:
+        if revrange[1] is None:
+          pass
+        else:
+          cmd.extend(['-r', ':' + revrange[1]])
+      else:
+        if revrange[1] is None:
+          cmd.extend(['-r', revrange[0] + ':'])
+        else:
+          cmd.extend(['-r', revrange[0] + ':' + revrange[1]])
+    else:
+      cmd.extend(['-r', str(revrange)])
+    if path:
+      cmd.extend(['--', type(self).cleanPath(path)])
+    output = self._command(cmd)
+
+    results = []
+    for log in output.split('\n\n')[:-1]:
+      rev, parents, date, author, subject = log.split('\n', 4)
+      parents = [x[1] for x in filter(lambda x: x[0] != '-1',
+        (x.split(':') for x in parents.split()))]
+      ts, tzoffset = date.split()
+      date = datetime.datetime.fromtimestamp(float(ts))
+      date = date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
+      subject = subject[1:]
+      results.append(CommitLogEntry(rev, parents, date, author, subject))
+    return results
+
+  def diff(self, rev_a, rev_b, path_a, path_b=None):
+    raise NotImplementedError

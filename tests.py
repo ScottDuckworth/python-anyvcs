@@ -1,12 +1,18 @@
 import anyvcs
+import datetime
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 from anyvcs import UnknownVCSType, PathDoesNotExist, BadFileType
+from anyvcs.common import CommitLogEntry, UTCOffset
 
 logfile = open(os.devnull, 'w')
+date_rx = re.compile(r'^(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})(?:\s+|T)(?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2})(?:\.(?P<us>\d{6}))?(?:Z|\s+(?P<tz>[+-]?\d{4}))$')
+
+UTC = UTCOffset(0, 'UTC')
 
 def check_call(args, **kwargs):
   logfile.write('%s\n' % repr(args))
@@ -14,60 +20,119 @@ def check_call(args, **kwargs):
   kwargs.setdefault('stderr', logfile)
   subprocess.check_call(args, **kwargs)
 
+def check_output(args, **kwargs):
+  logfile.write('%s\n' % repr(args))
+  kwargs.setdefault('stderr', logfile)
+  return subprocess.check_output(args, **kwargs)
+
 def normalize_ls(x):
   return sorted(x, key=lambda y: y.get('name'))
 
 def normalize_heads(x):
   return sorted(x)
 
-class GitTest(unittest.TestCase):
+def normalize_datetime(x):
+  return x.astimezone(UTC).replace(microsecond=0)
+
+def normalize_logmsg(x):
+  return x.rstrip()
+
+def parse_date(x):
+  m = date_rx.match(x)
+  if m is None:
+    return None
+  d = datetime.datetime(*[int(x) for x in m.group('year', 'month', 'day', 'hour', 'minute', 'second')])
+  if m.group('us'):
+    d = d.replace(microsecond=int(m.group('us')))
+  tz = m.group('tz')
+  if tz:
+    offset = datetime.timedelta(minutes=int(tz[-2:]), hours=int(tz[-4:-2]))
+    if tz[0] == '-':
+      offset = -offset
+  else:
+    offset = 0
+  d = d.replace(tzinfo=UTCOffset(offset))
+  return d
+
+class VCSTest(unittest.TestCase):
+  @classmethod
+  def setUpClass(cls):
+    cls.commits = []
+    cls.zerocommit = None
+    cls.dir = tempfile.mkdtemp(prefix='anyvcs-test.')
+    cls.main_path = os.path.join(cls.dir, 'main')
+    cls.working_path = os.path.join(cls.dir, 'work')
+
+  @classmethod
+  def tearDownClass(cls):
+    shutil.rmtree(cls.dir)
+
+  def assertCommitLogEqual(self, a, b):
+    for a_i, b_i in zip(a, b):
+      self.assertEqual(a_i.rev, b_i.rev)
+      self.assertEqual(a_i.parents, b_i.parents)
+      self.assertEqual(normalize_datetime(a_i.date), normalize_datetime(b_i.date), '%s != %s' % (a_i.date, b_i.date))
+      self.assertEqual(a_i.author, b_i.author)
+      self.assertEqual(a_i.subject, b_i.subject)
+
+class GitTest(VCSTest):
   head = 'master'
 
   @classmethod
   def setUpClass(cls):
-    cls.dir = tempfile.mkdtemp(prefix='anyvcs-test-git.')
-    main_path = os.path.join(cls.dir, 'main')
-    working_path = os.path.join(cls.dir, 'work')
-    cls.repo = anyvcs.create(main_path, 'git')
-    check_call(['git', 'clone', main_path, working_path])
-    for message in cls.setUpWorkingCopy(working_path):
-      check_call(['git', 'add', '.'], cwd=working_path)
-      check_call(['git', 'commit', '-m', message], cwd=working_path)
-    check_call(['git', 'push', 'origin', 'master'], cwd=working_path)
+    VCSTest.setUpClass()
+    cls.repo = anyvcs.create(cls.main_path, 'git')
+    check_call(['git', 'clone', cls.main_path, cls.working_path])
+    for message in cls.setUpWorkingCopy(cls.working_path):
+      check_call(['git', 'add', '.'], cwd=cls.working_path)
+      check_call(['git', 'commit', '-m', message], cwd=cls.working_path)
+      rev = check_output(['git', 'log', '-n1', '--pretty=format:%H'], cwd=cls.working_path)
+      parents = check_output(['git', 'log', '-n1', '--pretty=format:%P'], cwd=cls.working_path).split()
+      output = check_output(['git', 'log', '-n1', '--pretty=format:%ai'], cwd=cls.working_path)
+      date = parse_date(output)
+      author = check_output(['git', 'log', '-n1', '--pretty=format:%an <%ae>'], cwd=cls.working_path)
+      subject = check_output(['git', 'log', '-n1', '--pretty=format:%s'], cwd=cls.working_path)
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      cls.commits.insert(0, entry)
+    check_call(['git', 'push', 'origin', 'master'], cwd=cls.working_path)
 
-  @classmethod
-  def tearDownClass(cls):
-    shutil.rmtree(cls.dir)
-
-class HgTest(unittest.TestCase):
+class HgTest(VCSTest):
   head = 'default'
 
   @classmethod
   def setUpClass(cls):
-    cls.dir = tempfile.mkdtemp(prefix='anyvcs-test-hg.')
-    main_path = os.path.join(cls.dir, 'main')
-    working_path = os.path.join(cls.dir, 'work')
-    cls.repo = anyvcs.create(main_path, 'hg')
-    check_call(['hg', 'clone', main_path, working_path])
-    for message in cls.setUpWorkingCopy(working_path):
-      check_call(['hg', 'add', '.'], cwd=working_path)
-      check_call(['hg', 'commit', '-m', message], cwd=working_path)
-    check_call(['hg', 'push'], cwd=working_path)
+    VCSTest.setUpClass()
+    cls.repo = anyvcs.create(cls.main_path, 'hg')
+    check_call(['hg', 'clone', cls.main_path, cls.working_path])
+    for message in cls.setUpWorkingCopy(cls.working_path):
+      check_call(['hg', 'add', '.'], cwd=cls.working_path)
+      check_call(['hg', 'commit', '-m', message], cwd=cls.working_path)
+      rev = check_output(['hg', 'log', '-l1', '--template={node}'], cwd=cls.working_path)
+      parents = []
+      output = check_output(['hg', 'log', '-l1', '--template={parents}', '--debug'], cwd=cls.working_path)
+      for p in output.split():
+        r,node = p.split(':')
+        if r != '-1':
+          parents.append(node)
+      output = check_output(['hg', 'log', '-l1', '--template={date|isodatesec}'], cwd=cls.working_path)
+      date = parse_date(output)
+      author = check_output(['hg', 'log', '-l1', '--template={author}'], cwd=cls.working_path)
+      subject = check_output(['hg', 'log', '-l1', '--template={desc|firstline}'], cwd=cls.working_path)
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      cls.commits.insert(0, entry)
+    check_call(['hg', 'push'], cwd=cls.working_path)
 
-  @classmethod
-  def tearDownClass(cls):
-    shutil.rmtree(cls.dir)
-
-class SvnTest(unittest.TestCase):
+class SvnTest(VCSTest):
   head = 0
 
   @classmethod
   def setUpClass(cls):
-    cls.dir = tempfile.mkdtemp(prefix='anyvcs-test-svn.')
-    main_path = os.path.join(cls.dir, 'main')
-    working_path = os.path.join(cls.dir, 'work')
-    cls.repo = anyvcs.create(main_path, 'svn')
-    check_call(['svn', 'checkout', 'file://' + main_path, working_path])
+    import xml.etree.ElementTree as ET
+
+    VCSTest.setUpClass()
+    cls.zerocommit = 0
+    cls.repo = anyvcs.create(cls.main_path, 'svn')
+    check_call(['svn', 'checkout', 'file://' + cls.main_path, cls.working_path])
     def add(top, dirname, fnames):
       import stat
       dirname = os.path.relpath(dirname, top)
@@ -79,14 +144,21 @@ class SvnTest(unittest.TestCase):
         st = os.lstat(os.path.join(top, p))
         if stat.S_ISREG(st.st_mode) and stat.S_IXUSR & st.st_mode:
           check_call(['svn', 'propset', 'svn:executable', 'yes', p], cwd=top)
-    for message in cls.setUpWorkingCopy(working_path):
-      os.path.walk(working_path, add, working_path)
-      check_call(['svn', 'commit', '-m', message], cwd=working_path)
+    for message in cls.setUpWorkingCopy(cls.working_path):
+      os.path.walk(cls.working_path, add, cls.working_path)
+      check_call(['svn', 'commit', '-m', message], cwd=cls.working_path)
+      check_call(['svn', 'update'], cwd=cls.working_path)
+      xml = check_output(['svn', 'log', '-l1', '--xml'], cwd=cls.working_path)
+      root = ET.fromstring(xml)
+      logentry = root.find('logentry')
+      rev = int(logentry.attrib.get('revision'))
+      parents = [rev-1]
+      date = parse_date(logentry.find('date').text)
+      author = logentry.find('author').text
+      subject = logentry.find('msg').text.split('\n', 1)[0]
+      entry = CommitLogEntry(rev, parents, date, author, subject)
+      cls.commits.insert(0, entry)
       cls.head += 1
-
-  @classmethod
-  def tearDownClass(cls):
-    shutil.rmtree(cls.dir)
 
 
 class BasicTest(object):
@@ -292,6 +364,36 @@ class BasicTest(object):
 
   def test_readlink_error4(self):
     self.assertRaises(BadFileType, self.repo.readlink, self.head, '/c')
+
+  def test_log1(self):
+    result = self.repo.log()
+    correct = self.commits
+    self.assertGreaterEqual(len(result), len(correct))
+    self.assertCommitLogEqual(result, correct)
+
+  def test_log2(self):
+    result = self.repo.log(revrange=self.head)
+    correct = self.commits[0:1]
+    self.assertEqual(len(result), 1)
+    self.assertCommitLogEqual(result, correct)
+
+  def test_log3(self):
+    result = self.repo.log(revrange=(self.zerocommit, None))
+    correct = self.commits
+    self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
+    self.assertCommitLogEqual(result, correct)
+
+  def test_log4(self):
+    result = self.repo.log(revrange=(self.zerocommit, self.head))
+    correct = self.commits
+    self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
+    self.assertCommitLogEqual(result, correct)
+
+  def test_log5(self):
+    result = self.repo.log(limit=1)
+    correct = self.commits[0:1]
+    self.assertEqual(len(result), 1)
+    self.assertCommitLogEqual(result, correct)
 
 
 class BasicGitTest(GitTest, BasicTest):
