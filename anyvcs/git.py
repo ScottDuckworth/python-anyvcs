@@ -134,11 +134,13 @@ class GitRepo(VCSRepo):
     if followfirst:
       cmd.append('--first-parent')
     if revrange is None:
-      pass
+      if prune is not None:
+        cmd.append(prune + '..')
     elif isinstance(revrange, tuple):
       if revrange[0] is None:
         if revrange[1] is None:
-          pass
+          if prune is not None:
+            cmd.append(prune + '..')
         else:
           cmd.append(revrange[1])
       else:

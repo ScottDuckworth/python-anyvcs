@@ -150,6 +150,8 @@ class HgRepo(VCSRepo):
       cmd.append('--follow')
     if followfirst:
       cmd.append('--follow-first')
+    if prune is not None:
+      cmd.extend(['--prune', str(prune)])
     if revrange is None:
       pass
     elif isinstance(revrange, tuple):
