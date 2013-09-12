@@ -141,17 +141,19 @@ class HgRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags() + self.bookmarks()
 
-  def log(self, revrange=None, path=None, follow=False, followfirst=False,
-          prune=None, limit=None):
+  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
+          merges=None, path=None, follow=False):
     cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n:{desc|firstline}\n\n']
     if limit is not None:
       cmd.append('-l' + str(limit))
-    if follow:
-      cmd.append('--follow')
-    if followfirst:
+    if firstparent:
       cmd.append('--follow-first')
-    if prune is not None:
-      cmd.extend(['--prune', str(prune)])
+    if merges is not None:
+      if merges:
+        cmd.append('--only-merges')
+      else:
+        cmd.append('--no-merges')
+    trimlast = False
     if revrange is None:
       pass
     elif isinstance(revrange, tuple):
@@ -159,20 +161,31 @@ class HgRepo(VCSRepo):
         if revrange[1] is None:
           pass
         else:
-          cmd.extend(['-r', ':' + revrange[1]])
+          cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1]])
       else:
         if revrange[1] is None:
-          cmd.extend(['-r', revrange[0] + ':'])
+          cmd.extend(['-r', 'reverse(descendants(%s))' % revrange[0]])
         else:
-          cmd.extend(['-r', revrange[0] + ':' + revrange[1]])
+          if branchlog:
+            cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1], '--prune', str(revrange[0])])
+          else:
+            cmd.extend(['-r', 'reverse(%s..%s)' % (revrange[0], revrange[1])])
+            trimlast = True
     else:
       cmd.extend(['-r', str(revrange)])
     if path:
+      if follow:
+        cmd.append('--follow')
       cmd.extend(['--', type(self).cleanPath(path)])
     output = self._command(cmd)
 
     results = []
-    for log in output.split('\n\n')[:-1]:
+    logs = output.split('\n\n')
+    if trimlast:
+      logs = logs[:-2]
+    else:
+      logs = logs[:-1]
+    for log in logs:
       rev, parents, date, author, subject = log.split('\n', 4)
       parents = [x[1] for x in filter(lambda x: x[0] != '-1',
         (x.split(':') for x in parents.split()))]

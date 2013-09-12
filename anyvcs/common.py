@@ -179,20 +179,23 @@ class VCSRepo(object):
     raise NotImplementedError
 
   @abstractmethod
-  def log(self, revrange=None, path=None, follow=False, followfirst=False,
-          prune=None, limit=None):
-    """Get commit log
+  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
+          merges=None, path=None, follow=False):
+    """Get commit logs
 
     Arguments:
     revrange     Range of revisions as a 2-tuple (start,end) or end revision.
                  Start revision is non-inclusive, end revision is inclusive.
                  Start may be None, meaning the beginning of history. End may
                  be None, meaning the end of history.
+    limit        Limit the number of log entries.
+    branchlog    Interpret revrange[0] as either itself or one of its
+                 ancestors.
+    firstparent  Only follow the first parent of merges.
+    merges       True means only merges, False means no merges, None means
+                 both merges and non-merges.
     path         Only match commits containing changes on this path.
     follow       Follow file history across renames.
-    followfirst  Only follow the first parent of merges.
-    prune        Do not display this revision or any of its ancestors.
-    limit        Limit the number of log entries.
 
     Returns a list of CommitLogEntry objects in reverse chronological order.
 

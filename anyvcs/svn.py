@@ -152,20 +152,15 @@ class SvnRepo(VCSRepo):
   def heads(self):
     return ['HEAD'] + self._heads(('branches', 'tags'))
 
-  def log(self, revrange=None, path=None, follow=False, followfirst=False,
-          prune=None, limit=None):
+  def log(self, revrange=None, path=None, follow=False, firstparent=False,
+          branchlog=False, limit=None):
     if revrange is None:
       revrange = (None, None)
     if isinstance(revrange, tuple):
       if revrange[0] is None:
-        if prune is None:
-          startrev = None
-        else:
-          startrev = prune
+        startrev = None
       else:
         startrev = int(revrange[0])
-        if prune is not None:
-          startrev = max(startrev, int(prune))
       if revrange[1] is None:
         endrev = self.youngest()
       else:

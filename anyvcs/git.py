@@ -124,23 +124,24 @@ class GitRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags()
 
-  def log(self, revrange=None, path=None, follow=False, followfirst=False,
-          prune=None, limit=None):
+  def log(self, revrange=None, limit=None, branchlog=False, firstparent=False,
+          merges=None, path=None, follow=False):
     cmd = [GIT, 'log', '--pretty=format:%H%n:%P%n%ai%n%an <%ae>%n:%s%n%n']
     if limit is not None:
       cmd.append('-' + str(limit))
-    if follow:
-      cmd.append('--follow')
-    if followfirst:
+    if firstparent:
       cmd.append('--first-parent')
+    if merges is not None:
+      if merges:
+        cmd.append('--merges')
+      else:
+        cmd.append('--no-merges')
     if revrange is None:
-      if prune is not None:
-        cmd.append(prune + '..')
+      pass
     elif isinstance(revrange, tuple):
       if revrange[0] is None:
         if revrange[1] is None:
-          if prune is not None:
-            cmd.append(prune + '..')
+          pass
         else:
           cmd.append(revrange[1])
       else:
@@ -151,6 +152,8 @@ class GitRepo(VCSRepo):
     else:
       cmd.extend(['-1', revrange])
     if path:
+      if follow:
+        cmd.append('--follow')
       cmd.extend(['--', type(self).cleanPath(path)])
     output = self._command(cmd)
 
