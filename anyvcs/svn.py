@@ -26,9 +26,9 @@ class SvnRepo(VCSRepo):
     output = self._command(cmd)
     return [x.strip() for x in output.splitlines()]
 
-  def _maprev(self, rev, path):
+  def _maprev(self, rev):
     if isinstance(rev, int):
-      return (rev, path)
+      return (rev, '')
     m = head_rev_rx.match(rev)
     assert m, 'invalid rev'
     head, rev = m.group('head', 'rev')
@@ -37,16 +37,16 @@ class SvnRepo(VCSRepo):
     else:
       rev = self.youngest()
     if head is None:
-      return (rev, path)
+      return (rev, '')
     elif head == 'HEAD':
-      return (rev, path)
+      return (rev, '')
     else:
-      return (rev, '/' + head + '/' + path)
+      return (rev, '/' + head)
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
-    rev, path = self._maprev(rev, path)
-    path = type(self).cleanPath(path)
+    rev, prefix = self._maprev(rev)
+    path = type(self).cleanPath(prefix + path)
     forcedir = False
     if path.endswith('/'):
       forcedir = True
@@ -114,8 +114,8 @@ class SvnRepo(VCSRepo):
     return self._command(cmd)
 
   def cat(self, rev, path):
-    rev, path = self._maprev(rev, path)
-    path = type(self).cleanPath(path)
+    rev, prefix = self._maprev(rev)
+    path = type(self).cleanPath(prefix + path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'f':
@@ -129,8 +129,8 @@ class SvnRepo(VCSRepo):
     return link[1]
 
   def readlink(self, rev, path):
-    rev, path = self._maprev(rev, path)
-    path = type(self).cleanPath(path)
+    rev, prefix = self._maprev(rev)
+    path = type(self).cleanPath(prefix + path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'l':
