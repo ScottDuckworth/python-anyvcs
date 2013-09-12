@@ -24,7 +24,6 @@ class HgRepo(VCSRepo):
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     forcedir = False
     if path.endswith('/'):
@@ -39,7 +38,7 @@ class HgRepo(VCSRepo):
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [HG, 'manifest', '-v', '-r', rev]
+    cmd = [HG, 'manifest', '-v', '-r', str(rev)]
     output = self._command(cmd)
     dirs = set()
     results = []
@@ -74,11 +73,11 @@ class HgRepo(VCSRepo):
           if 'executable' in report:
             entry.executable = t == '*'
           if 'size' in report:
-            entry.size = len(self.cat(rev, name))
+            entry.size = len(self._cat(str(rev), name))
         elif t == '@':
           entry.type = 'l'
           if 'target' in report:
-            entry.target = self._readlink(rev, name)
+            entry.target = self._cat(str(rev), name)
         else:
           assert False, 'unexpected output: ' + line
         results.append(entry)
@@ -86,28 +85,26 @@ class HgRepo(VCSRepo):
       raise PathDoesNotExist(rev, path)
     return results
 
+  def _cat(self, rev, path):
+    cmd = [HG, 'cat', '-r', rev, path]
+    return self._command(cmd)
+
   def cat(self, rev, path):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'f':
       raise BadFileType(rev, path)
-    cmd = [HG, 'cat', '-r', rev, path]
-    return self._command(cmd)
-
-  def _readlink(self, rev, path):
-    cmd = [HG, 'cat', '-r', rev, path]
+    cmd = [HG, 'cat', '-r', str(rev), path]
     return self._command(cmd)
 
   def readlink(self, rev, path):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
     if ls[0].type != 'l':
       raise BadFileType(rev, path)
-    return self._readlink(rev, path)
+    return self._cat(str(rev), path)
 
   def _parse_heads(self, cmd):
     output = self._command(cmd)

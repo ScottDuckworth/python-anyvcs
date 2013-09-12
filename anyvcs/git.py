@@ -17,7 +17,6 @@ class GitRepo(VCSRepo):
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     forcedir = False
     if directory and path.endswith('/'):
@@ -84,7 +83,6 @@ class GitRepo(VCSRepo):
     return results
 
   def cat(self, rev, path):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
@@ -98,7 +96,6 @@ class GitRepo(VCSRepo):
     return self._command(cmd)
 
   def readlink(self, rev, path):
-    rev = type(self).cleanRev(rev)
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1

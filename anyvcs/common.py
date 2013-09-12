@@ -86,10 +86,6 @@ class VCSRepo(object):
     return subprocess.check_output(cmd, **kwargs)
 
   @classmethod
-  def cleanRev(cls, rev):
-    return str(rev)
-
-  @classmethod
   def cleanPath(cls, path):
     path = path.lstrip('/')
     path = multislash_rx.sub('/', path)
