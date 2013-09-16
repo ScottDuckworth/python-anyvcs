@@ -191,3 +191,7 @@ class HgRepo(VCSRepo):
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
+
+  def ancestor(self, rev1, rev2):
+    cmd = [HG, 'log', '--template={node}', '-r', 'ancestor(%s, %s)' % (rev1, rev2)]
+    return self._command(cmd)

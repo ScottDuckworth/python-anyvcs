@@ -1,3 +1,4 @@
+import collections
 import re
 import subprocess
 from common import *
@@ -6,6 +7,9 @@ SVNADMIN = 'svnadmin'
 SVNLOOK = 'svnlook'
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
+mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
+
+HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
 class SvnRepo(VCSRepo):
   @classmethod
@@ -245,3 +249,85 @@ class SvnRepo(VCSRepo):
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
+
+  def _history(self, rev, path, limit=None):
+    cmd = [SVNLOOK, 'history', '.', '-r', str(rev), path]
+    if limit is not None:
+      cmd.extend(['-l', str(limit)])
+    output = self._command(cmd)
+    results = []
+    for line in output.splitlines()[2:]:
+      r, p = line.split(None, 1)
+      results.append(HistoryEntry(int(r), p))
+    return results
+
+  def ancestor(self, rev1, rev2):
+    rev1, prefix1 = self._maprev(rev1)
+    rev2, prefix2 = self._maprev(rev2)
+    prefix1 = type(self).cleanPath(prefix1)
+    if prefix1 != '/':
+      prefix1 = prefix1.rstrip('/')
+    prefix2 = type(self).cleanPath(prefix2)
+    if prefix2 != '/':
+      prefix2 = prefix2.rstrip('/')
+
+    self.ls(rev1, prefix1, directory=True)
+    self.ls(rev2, prefix2, directory=True)
+
+    minrev = min(rev1, rev2)
+    if prefix1 == prefix2:
+      return '%s:%d' % (prefix1, minrev)
+
+    history1 = self._history(minrev, prefix1)
+    history2 = self._history(minrev, prefix2)
+
+    youngest = HistoryEntry(0, '/')
+
+    if 'svn:mergeinfo' in self._proplist(str(rev1), prefix1):
+      mergeinfo = self._propget('svn:mergeinfo', str(rev1), prefix1)
+      for line in mergeinfo.splitlines():
+        m = mergeinfo_rx.match(line)
+        assert m
+        head, minrev, maxrev = m.group('head', 'minrev', 'maxrev')
+        minrev = int(minrev)
+        maxrev = int(maxrev or minrev)
+        for h in history2:
+          if h.rev < minrev or h.rev < youngest.rev:
+            break
+          if h.path == head and minrev <= h.rev <= maxrev:
+            youngest = h
+
+    if 'svn:mergeinfo' in self._proplist(str(rev2), prefix2):
+      mergeinfo = self._propget('svn:mergeinfo', str(rev2), prefix2)
+      for line in mergeinfo.splitlines():
+        m = mergeinfo_rx.match(line)
+        assert m
+        head, minrev, maxrev = m.group('head', 'minrev', 'maxrev')
+        minrev = int(minrev)
+        maxrev = int(maxrev or minrev)
+        for h in history1:
+          if h.rev < minrev or h.rev < youngest.rev:
+            break
+          if h.path == head and minrev <= h.rev <= maxrev:
+            youngest = h
+
+    if youngest.rev > 0:
+      return '%s:%d' % (youngest.path, youngest.rev)
+
+    i1 = 0
+    i2 = 0
+    len1 = len(history1)
+    len2 = len(history2)
+    while i1 < len1 and i2 < len2:
+      if history1[i1].rev < history2[i2].rev:
+        i2 += 1
+      elif history1[i1].rev > history2[i2].rev:
+        i1 += 1
+      else:
+        if history1[i1].path == history2[i2].path:
+          return '%s:%d' % (history1[i1].path, history1[i1].rev)
+        else:
+          i1 += 1
+          i2 += 1
+
+    return 0

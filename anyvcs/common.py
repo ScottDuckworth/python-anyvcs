@@ -204,3 +204,9 @@ class VCSRepo(object):
   @abstractmethod
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
+
+  @abstractmethod
+  def ancestor(self, rev1, rev2):
+    """Find most recent common ancestor of two revisions
+    """
+    raise NotImplementedError

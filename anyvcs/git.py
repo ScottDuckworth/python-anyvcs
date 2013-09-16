@@ -170,3 +170,7 @@ class GitRepo(VCSRepo):
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
+
+  def ancestor(self, rev1, rev2):
+    cmd = [GIT, 'merge-base', rev1, rev2]
+    return self._command(cmd)
