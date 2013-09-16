@@ -34,17 +34,17 @@ class SvnRepo(VCSRepo):
       path = type(self).cleanPath(prefix + path)
       return self._proplist(rev, path)
 
-  def _propget(self, rev, path):
-    cmd = [SVNLOOK, 'propget', '-r', rev, '.', path or '--revprop']
+  def _propget(self, prop, rev, path):
+    cmd = [SVNLOOK, 'propget', '-r', rev, '.', prop, path or '--revprop']
     return self._command(cmd)
 
-  def propget(self, rev, path=None):
+  def propget(self, prop, rev, path=None):
     rev, prefix = self._maprev(rev)
     if path is None:
-      return self._propget(rev, None)
+      return self._propget(prop, rev, None)
     else:
       path = type(self).cleanPath(prefix + path)
-      return self._propget(rev, path)
+      return self._propget(prop, rev, path)
 
   def _maprev(self, rev):
     if isinstance(rev, int):
