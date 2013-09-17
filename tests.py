@@ -82,6 +82,7 @@ class GitTest(VCSTest):
     VCSTest.setUpClass()
     cls.repo = anyvcs.create(cls.main_path, 'git')
     check_call(['git', 'clone', cls.main_path, cls.working_path])
+    dopush = False
     for message in cls.setUpWorkingCopy(cls.working_path):
       check_call(['git', 'add', '.'], cwd=cls.working_path)
       check_call(['git', 'commit', '-m', message], cwd=cls.working_path)
@@ -93,7 +94,9 @@ class GitTest(VCSTest):
       subject = check_output(['git', 'log', '-n1', '--pretty=format:%s'], cwd=cls.working_path)
       entry = CommitLogEntry(rev, parents, date, author, subject)
       cls.commits.insert(0, entry)
-    check_call(['git', 'push', 'origin', 'master'], cwd=cls.working_path)
+      dopush = True
+    if dopush:
+      check_call(['git', 'push', 'origin', 'master'], cwd=cls.working_path)
 
 class HgTest(VCSTest):
   head = 'default'
@@ -160,6 +163,17 @@ class SvnTest(VCSTest):
       cls.head += 1
 
 
+class EmptyTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    return
+    yield
+
+  def test_empty(self):
+    result = self.repo.empty()
+    correct = True
+    self.assertEqual(result, correct)
+
 class BasicTest(object):
   @classmethod
   def setUpWorkingCopy(cls, working_path):
@@ -174,6 +188,11 @@ class BasicTest(object):
     os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
     os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
     yield 'commit 1'
+
+  def test_empty(self):
+    result = self.repo.empty()
+    correct = False
+    self.assertEqual(result, correct)
 
   def test_ls1(self):
     result = self.repo.ls(self.head, '')
@@ -398,6 +417,72 @@ class BasicTest(object):
     for result_i, correct_i in zip(result, correct):
       self.assertCommitLogEqual(result_i, correct_i)
 
+
+class EmptyGitTest(GitTest, EmptyTest):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_tags(self):
+    result = self.repo.tags()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_heads(self):
+    result = self.repo.heads()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_log(self):
+    result = self.repo.log()
+    self.assertEqual(len(result), 0)
+
+class EmptyHgTest(HgTest, EmptyTest):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_tags(self):
+    result = self.repo.tags()
+    correct = ['tip']
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_bookmarks(self):
+    result = self.repo.bookmarks()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_heads(self):
+    result = self.repo.heads()
+    correct = ['tip']
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_log(self):
+    result = self.repo.log()
+    self.assertEqual(len(result), 0)
+
+class EmptySvnTest(SvnTest, EmptyTest):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_tags(self):
+    result = self.repo.tags()
+    correct = []
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_heads(self):
+    result = self.repo.heads()
+    correct = ['HEAD']
+    self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_log(self):
+    result = self.repo.log()
+    self.assertEqual(len(result), 1)
+    self.assertEqual(result[0].rev, 0)
 
 class BasicGitTest(GitTest, BasicTest):
   def test_branches(self):
