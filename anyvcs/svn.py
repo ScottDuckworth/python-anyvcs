@@ -195,6 +195,11 @@ class SvnRepo(VCSRepo):
   def heads(self):
     return ['HEAD'] + self._heads(('branches', 'tags'))
 
+  def empty(self):
+    cmd = [SVNLOOK, 'history', '.', '-l2']
+    output = self._command(cmd)
+    return len(output.splitlines()) < 4
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     if revrange is None:

@@ -175,6 +175,12 @@ class VCSRepo(object):
     raise NotImplementedError
 
   @abstractmethod
+  def empty(self):
+    """Test if the repository contains any commits
+    """
+    return NotImplementedError
+
+  @abstractmethod
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     """Get commit logs

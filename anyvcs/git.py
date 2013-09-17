@@ -7,6 +7,7 @@ GIT = 'git'
 
 ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?:[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
+rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
 
 class GitRepo(VCSRepo):
   @classmethod
@@ -121,8 +122,18 @@ class GitRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags()
 
+  def empty(self):
+    cmd = [GIT, 'rev-parse', 'HEAD']
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return not rev_rx.match(stdout)
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
+    if self.empty():
+      return []
+
     cmd = [GIT, 'log', '--pretty=format:%H%n:%P%n%ai%n%an <%ae>%n:%s%n%n']
     if limit is not None:
       cmd.append('-' + str(limit))

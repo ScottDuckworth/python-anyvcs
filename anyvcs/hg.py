@@ -138,6 +138,11 @@ class HgRepo(VCSRepo):
   def heads(self):
     return self.branches() + self.tags() + self.bookmarks()
 
+  def empty(self):
+    cmd = [HG, 'log', '--template=a', '-l1']
+    output = self._command(cmd)
+    return output == ''
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n:{desc|firstline}\n\n']
