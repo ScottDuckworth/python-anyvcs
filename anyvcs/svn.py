@@ -67,7 +67,7 @@ class SvnRepo(VCSRepo):
 
   def _maprev(self, rev):
     if isinstance(rev, int):
-      return (rev, '')
+      return (rev, '/')
     m = head_rev_rx.match(rev)
     assert m, 'invalid rev'
     head, rev = m.group('head', 'rev')
