@@ -134,7 +134,7 @@ class GitRepo(VCSRepo):
     if self.empty():
       return []
 
-    cmd = [GIT, 'log', '--pretty=format:%H%n:%P%n%ai%n%an <%ae>%n:%s%n%n']
+    cmd = [GIT, 'log', '-z', '--pretty=format:%H%n%P%n%ai%n%an <%ae>%n%B']
     if limit is not None:
       cmd.append('-' + str(limit))
     if firstparent:
@@ -168,12 +168,11 @@ class GitRepo(VCSRepo):
     output = self._command(cmd)
 
     results = []
-    for log in output.split('\n\n')[:-1]:
-      rev, parents, date, author, subject = log.split('\n', 4)
-      parents = parents[1:].split()
+    for log in output.split('\0'):
+      rev, parents, date, author, message = log.split('\n', 4)
+      parents = parents.split()
       date = parse_isodate(date)
-      subject = subject[1:]
-      entry = CommitLogEntry(rev, parents, date, author, subject)
+      entry = CommitLogEntry(rev, parents, date, author, message)
       if single:
         return entry
       results.append(entry)

@@ -38,18 +38,22 @@ class attrdict(dict):
     self.__delitem__(name)
 
 class CommitLogEntry(object):
-  def __init__(self, rev, parents, date, author, subject):
+  def __init__(self, rev, parents, date, author, message):
     self.rev = rev
     self.parents = parents
     self.date = date
     self.author = author
-    self.subject = subject
+    self.message = message
 
   def __str__(self):
     return str(self.rev)
 
   def __repr__(self):
     return str('<%s.%s %s>' % (type(self).__module__, type(self).__name__, self.rev))
+
+  @property
+  def subject(self):
+    return self.message.splitlines()[0]
 
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()

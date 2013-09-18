@@ -145,7 +145,7 @@ class HgRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n:{desc|firstline}\n\n']
+    cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n{desc|tabindent}\n\n']
     if limit is not None:
       cmd.append('-l' + str(limit))
     if firstparent:
@@ -181,14 +181,14 @@ class HgRepo(VCSRepo):
     results = []
     logs = output.split('\n\n')[:-1]
     for log in logs:
-      rev, parents, date, author, subject = log.split('\n', 4)
+      rev, parents, date, author, message = log.split('\n', 4)
       parents = [x[1] for x in filter(lambda x: x[0] != '-1',
         (x.split(':') for x in parents.split()))]
       ts, tzoffset = date.split()
       date = datetime.datetime.fromtimestamp(float(ts))
       date = date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
-      subject = subject[1:]
-      entry = CommitLogEntry(rev, parents, date, author, subject)
+      message = message.replace('\n\t', '\n')
+      entry = CommitLogEntry(rev, parents, date, author, message)
       if single:
         return entry
       results.append(entry)

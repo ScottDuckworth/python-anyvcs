@@ -245,8 +245,7 @@ class SvnRepo(VCSRepo):
       else:
         parents = [rev - 1]
       date = parse_isodate(date)
-      subject = message.split('\n', 1)[0]
-      entry = CommitLogEntry(rev, parents, date, author, subject)
+      entry = CommitLogEntry(rev, parents, date, author, message)
       if single:
         return entry
       results.append(entry)
