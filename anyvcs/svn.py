@@ -50,6 +50,21 @@ class SvnRepo(VCSRepo):
       path = type(self).cleanPath(prefix + path)
       return self._propget(prop, str(rev), path)
 
+  def _mergeinfo(self, rev, path):
+    revstr = str(rev)
+    if 'svn:mergeinfo' not in self._proplist(revstr, path):
+      return []
+    results = []
+    mergeinfo = self._propget('svn:mergeinfo', revstr, path)
+    for line in mergeinfo.splitlines():
+      m = mergeinfo_rx.match(line)
+      assert m
+      head, minrev, maxrev = m.group('head', 'minrev', 'maxrev')
+      minrev = int(minrev)
+      maxrev = int(maxrev or minrev)
+      results.append((head, minrev, maxrev))
+    return results
+
   def _maprev(self, rev):
     if isinstance(rev, int):
       return (rev, '')
@@ -287,33 +302,19 @@ class SvnRepo(VCSRepo):
 
     youngest = HistoryEntry(0, '/')
 
-    if 'svn:mergeinfo' in self._proplist(str(rev1), prefix1):
-      mergeinfo = self._propget('svn:mergeinfo', str(rev1), prefix1)
-      for line in mergeinfo.splitlines():
-        m = mergeinfo_rx.match(line)
-        assert m
-        head, minrev, maxrev = m.group('head', 'minrev', 'maxrev')
-        minrev = int(minrev)
-        maxrev = int(maxrev or minrev)
-        for h in history2:
-          if h.rev < minrev or h.rev < youngest.rev:
-            break
-          if h.path == head and minrev <= h.rev <= maxrev:
-            youngest = h
+    for head, minrev, maxrev in self._mergeinfo(rev1, prefix1):
+      for h in history2:
+        if h.rev < minrev or h.rev < youngest.rev:
+          break
+        if h.path == head and minrev <= h.rev <= maxrev:
+          youngest = h
 
-    if 'svn:mergeinfo' in self._proplist(str(rev2), prefix2):
-      mergeinfo = self._propget('svn:mergeinfo', str(rev2), prefix2)
-      for line in mergeinfo.splitlines():
-        m = mergeinfo_rx.match(line)
-        assert m
-        head, minrev, maxrev = m.group('head', 'minrev', 'maxrev')
-        minrev = int(minrev)
-        maxrev = int(maxrev or minrev)
-        for h in history1:
-          if h.rev < minrev or h.rev < youngest.rev:
-            break
-          if h.path == head and minrev <= h.rev <= maxrev:
-            youngest = h
+    for head, minrev, maxrev in self._mergeinfo(rev2, prefix2):
+      for h in history1:
+        if h.rev < minrev or h.rev < youngest.rev:
+          break
+        if h.path == head and minrev <= h.rev <= maxrev:
+          youngest = h
 
     if youngest.rev > 0:
       return '%s:%d' % (youngest.path, youngest.rev)
