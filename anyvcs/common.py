@@ -53,7 +53,7 @@ class CommitLogEntry(object):
 
   @property
   def subject(self):
-    return self.message.splitlines()[0]
+    return self.message.split('\n', 1)[0]
 
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()
