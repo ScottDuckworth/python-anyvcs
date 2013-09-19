@@ -1,4 +1,5 @@
 import collections
+import fnmatch
 import re
 import subprocess
 from common import *
@@ -24,6 +25,11 @@ class SvnRepo(VCSRepo):
     if not path.startswith('/'):
       path = '/' + path
     return path
+
+  def __init__(self, path):
+    super(SvnRepo, self).__init__(path)
+    self.branch_glob = ['/trunk/', '/branches/*/']
+    self.tag_glob = ['/tags/*/']
 
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
@@ -180,35 +186,38 @@ class SvnRepo(VCSRepo):
     cmd = [SVNLOOK, 'youngest', '.']
     return int(self._command(cmd))
 
-  def _heads(self, headdirs):
+  def _heads(self, globs):
+    root = {}
+    for glob in globs:
+      n = root
+      for p in glob.strip('/').split('/'):
+        n = n.setdefault(p, {})
     youngest = self.youngest()
-    root = self.ls(youngest, '/')
-    if {'name':'trunk', 'type':'d'} in root:
-      roots = [('', root)]
-    else:
-      roots = []
-      for d in (x.name for x in filter(lambda x: x.type == 'd', root)):
-        droot = self.ls(youngest, '/' + d + '/')
-        if {'name':'trunk', 'type':'d'} in droot:
-          roots.append((d+'/', droot))
     results = []
-    for prefix, root in roots:
-      results.append(prefix + 'trunk')
-      for d in headdirs:
-        if {'name':d, 'type':'d'} in root:
-          dls = self.ls(self.youngest(), '/' + prefix + d + '/')
-          results.extend(prefix + d + '/' + x.name
-                         for x in filter(lambda x: x.type == 'd', dls))
+    def match(n, path):
+      for d in self.ls(youngest, path):
+        if d.type == 'd':
+          for k, v in n.iteritems():
+            if fnmatch.fnmatchcase(d.name, k):
+              if path:
+                p = path + '/' + d.name
+              else:
+                p = d.name
+              if v:
+                match(v, p)
+              else:
+                results.append(p)
+    match(root, '')
     return results
 
   def branches(self):
-    return self._heads(('branches',))
+    return self._heads(self.branch_glob)
 
   def tags(self):
-    return self._heads(('tags',))
+    return self._heads(self.tag_glob)
 
   def heads(self):
-    return ['HEAD'] + self._heads(('branches', 'tags'))
+    return ['HEAD'] + self._heads(self.branch_glob + self.tag_glob)
 
   def empty(self):
     cmd = [SVNLOOK, 'history', '.', '-l2']
