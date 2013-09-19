@@ -183,4 +183,12 @@ class GitRepo(VCSRepo):
 
   def ancestor(self, rev1, rev2):
     cmd = [GIT, 'merge-base', rev1, rev2]
-    return self._command(cmd).rstrip()
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if p.returncode == 0:
+      return stdout.rstrip()
+    elif p.returncode == 1:
+      return None
+    else:
+      raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
