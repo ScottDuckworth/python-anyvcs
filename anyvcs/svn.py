@@ -335,4 +335,4 @@ class SvnRepo(VCSRepo):
           i1 += 1
           i2 += 1
 
-    return 0
+    return None
