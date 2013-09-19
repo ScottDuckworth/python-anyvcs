@@ -6,10 +6,16 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
+from abc import ABCMeta, abstractmethod
 from anyvcs import UnknownVCSType, PathDoesNotExist, BadFileType
 from anyvcs.common import CommitLogEntry, UTCOffset
 
-logfile = open(os.devnull, 'w')
+if False:
+  import sys
+  logfile = sys.stdout
+else:
+  logfile = open(os.devnull, 'w')
 date_rx = re.compile(r'^(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})(?:\s+|T)(?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2})(?:\.(?P<us>\d{6}))?(?:Z|\s+(?P<tz>[+-]?\d{4}))$')
 
 UTC = UTCOffset(0, 'UTC')
@@ -54,18 +60,57 @@ def parse_date(x):
   d = d.replace(tzinfo=UTCOffset(offset))
   return d
 
+
+### VCS FRAMEWORK CLASSES ###
+
 class VCSTest(unittest.TestCase):
+  __metaclass__ = ABCMeta
+
   @classmethod
   def setUpClass(cls):
-    cls.commits = []
-    cls.zerocommit = None
     cls.dir = tempfile.mkdtemp(prefix='anyvcs-test.')
     cls.main_path = os.path.join(cls.dir, 'main')
     cls.working_path = os.path.join(cls.dir, 'work')
+    cls.working_head = None
+    cls.setUpRepos()
+
+  @classmethod
+  def setUpRepos(cls):
+    raise NotImplementedError
+
+  @classmethod
+  def getAbsoluteRev(cls):
+    raise NotImplementedError
 
   @classmethod
   def tearDownClass(cls):
     shutil.rmtree(cls.dir)
+
+  @classmethod
+  def check_call(cls, *args, **kwargs):
+    kwargs.setdefault('cwd', cls.working_path)
+    check_call(*args, **kwargs)
+
+  @classmethod
+  def check_output(cls, *args, **kwargs):
+    kwargs.setdefault('cwd', cls.working_path)
+    return check_output(*args, **kwargs)
+
+  @classmethod
+  def encode_branch(cls, s):
+    return s
+
+  @classmethod
+  def decode_branch(cls, s):
+    return s
+
+  @classmethod
+  def encode_tag(cls, s):
+    return s
+
+  @classmethod
+  def decode_tag(cls, s):
+    return s
 
   def assertCommitLogEqual(self, a, b):
     self.assertEqual(a.rev, b.rev)
@@ -75,93 +120,255 @@ class VCSTest(unittest.TestCase):
     self.assertEqual(a.subject, b.subject)
 
 class GitTest(VCSTest):
-  head = 'master'
-
   @classmethod
-  def setUpClass(cls):
-    VCSTest.setUpClass()
+  def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'git')
     check_call(['git', 'clone', cls.main_path, cls.working_path])
-    dopush = False
-    for message in cls.setUpWorkingCopy(cls.working_path):
-      check_call(['git', 'add', '.'], cwd=cls.working_path)
-      check_call(['git', 'commit', '-m', message], cwd=cls.working_path)
-      rev = check_output(['git', 'log', '-n1', '--pretty=format:%H'], cwd=cls.working_path)
-      parents = check_output(['git', 'log', '-n1', '--pretty=format:%P'], cwd=cls.working_path).split()
-      output = check_output(['git', 'log', '-n1', '--pretty=format:%ai'], cwd=cls.working_path)
-      date = parse_date(output)
-      author = check_output(['git', 'log', '-n1', '--pretty=format:%an <%ae>'], cwd=cls.working_path)
-      subject = check_output(['git', 'log', '-n1', '--pretty=format:%s'], cwd=cls.working_path)
-      entry = CommitLogEntry(rev, parents, date, author, subject)
-      cls.commits.insert(0, entry)
-      dopush = True
-    if dopush:
-      check_call(['git', 'push', 'origin', 'master'], cwd=cls.working_path)
+    cls.main_branch = 'master'
+    cls.working_head = 'master'
+    for action in cls.setUpWorkingCopy(cls.working_path):
+      action.doGit(cls)
+
+  @classmethod
+  def getAbsoluteRev(cls):
+    return cls.check_output(['git', 'log', '-1', '--pretty=format:%H'])
 
 class HgTest(VCSTest):
-  head = 'default'
-
   @classmethod
-  def setUpClass(cls):
-    VCSTest.setUpClass()
+  def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'hg')
     check_call(['hg', 'clone', cls.main_path, cls.working_path])
-    for message in cls.setUpWorkingCopy(cls.working_path):
-      check_call(['hg', 'add', '.'], cwd=cls.working_path)
-      check_call(['hg', 'commit', '-m', message], cwd=cls.working_path)
-      rev = check_output(['hg', 'log', '-l1', '--template={node}'], cwd=cls.working_path)
-      parents = []
-      output = check_output(['hg', 'log', '-l1', '--template={parents}', '--debug'], cwd=cls.working_path)
-      for p in output.split():
-        r,node = p.split(':')
-        if r != '-1':
-          parents.append(node)
-      output = check_output(['hg', 'log', '-l1', '--template={date|isodatesec}'], cwd=cls.working_path)
-      date = parse_date(output)
-      author = check_output(['hg', 'log', '-l1', '--template={author}'], cwd=cls.working_path)
-      subject = check_output(['hg', 'log', '-l1', '--template={desc|firstline}'], cwd=cls.working_path)
-      entry = CommitLogEntry(rev, parents, date, author, subject)
-      cls.commits.insert(0, entry)
-    check_call(['hg', 'push'], cwd=cls.working_path)
-
-class SvnTest(VCSTest):
-  head = 0
+    cls.main_branch = 'default'
+    cls.working_head = 'default'
+    for action in cls.setUpWorkingCopy(cls.working_path):
+      action.doHg(cls)
 
   @classmethod
-  def setUpClass(cls):
-    import xml.etree.ElementTree as ET
+  def getAbsoluteRev(cls):
+    return cls.check_output(['hg', 'log', '-l1', '--template={node}'])
 
-    VCSTest.setUpClass()
-    cls.zerocommit = 0
+class SvnTest(VCSTest):
+  @classmethod
+  def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'svn')
     check_call(['svn', 'checkout', 'file://' + cls.main_path, cls.working_path])
-    def add(top, dirname, fnames):
-      import stat
-      dirname = os.path.relpath(dirname, top)
-      if '.svn' in fnames:
-        del fnames[fnames.index('.svn')]
-      for fname in fnames:
-        p = os.path.join(dirname, fname)
-        check_call(['svn', 'add', '-q', '--force', p], cwd=top)
-        st = os.lstat(os.path.join(top, p))
-        if stat.S_ISREG(st.st_mode) and stat.S_IXUSR & st.st_mode:
-          check_call(['svn', 'propset', 'svn:executable', 'yes', p], cwd=top)
-    for message in cls.setUpWorkingCopy(cls.working_path):
-      os.path.walk(cls.working_path, add, cls.working_path)
-      check_call(['svn', 'commit', '-m', message], cwd=cls.working_path)
-      check_call(['svn', 'update'], cwd=cls.working_path)
-      xml = check_output(['svn', 'log', '-l1', '--xml'], cwd=cls.working_path)
-      root = ET.fromstring(xml)
-      logentry = root.find('logentry')
-      rev = int(logentry.attrib.get('revision'))
-      parents = [rev-1]
-      date = parse_date(logentry.find('date').text)
-      author = logentry.find('author').text
-      subject = logentry.find('msg').text.split('\n', 1)[0]
-      entry = CommitLogEntry(rev, parents, date, author, subject)
-      cls.commits.insert(0, entry)
-      cls.head += 1
+    cls.main_branch = 'HEAD'
+    cls.working_head = 'HEAD'
+    for action in cls.setUpWorkingCopy(cls.working_path):
+      action.doSvn(cls)
 
+  @classmethod
+  def getAbsoluteRev(cls):
+    xml = cls.check_output(['svn', 'info', '--xml'])
+    tree = ET.fromstring(xml)
+    rev = tree.find('entry').attrib.get('revision')
+    if cls.working_head == 'HEAD':
+      return int(rev)
+    else:
+      return '/%s:%s' % (cls.working_head, rev)
+
+  @classmethod
+  def encode_branch(cls, s):
+    if s == 'trunk':
+      return s
+    return 'branches/' + s
+
+  @classmethod
+  def decode_branch(cls, s):
+    if s == 'trunk':
+      return s
+    assert s.startswith('branches/')
+    return s[9:]
+
+  @classmethod
+  def encode_tag(cls, s):
+    return 'tags/' + s
+
+  @classmethod
+  def decode_tag(cls, s):
+    assert s.startswith('tags/')
+    return s[5:]
+
+
+class Action(object):
+  __metaclass__ = ABCMeta
+
+  @abstractmethod
+  def doGit(self, test):
+    raise NotImplementedError
+
+  @abstractmethod
+  def doHg(self, test):
+    raise NotImplementedError
+
+  @abstractmethod
+  def doSvn(self, test):
+    raise NotImplementedError
+
+class CreateStandardDirectoryStructure(Action):
+  """Create the standard directory structure, if any"""
+
+  def doGit(self, test):
+    pass
+
+  def doHg(self, test):
+    pass
+
+  def doSvn(self, test):
+    test.check_call(['svn', 'mkdir', 'trunk', 'branches', 'tags'])
+    commit = Commit('create standard directory structure')
+    commit.doSvn(test)
+    test.check_call(['svn', 'switch', 'file://'+test.main_path+'/trunk'])
+    test.main_branch = 'trunk'
+    test.working_head = 'trunk'
+
+class Commit(Action):
+  """Commit and push"""
+
+  def __init__(self, message):
+    self.message = message
+
+  def doGit(self, test):
+    test.check_call(['git', 'add', '-A', '.'])
+    test.check_call(['git', 'commit', '-m', self.message])
+    test.check_call(['git', 'push', '--set-upstream', 'origin', test.working_head])
+
+  def doHg(self, test):
+    test.check_call(['hg', 'addremove'])
+    test.check_call(['hg', 'commit', '-m', self.message])
+    test.check_call(['hg', 'push', '--new-branch', '-b', test.working_head])
+
+  def doSvn(self, test):
+    xml = test.check_output(['svn', 'status', '--xml'])
+    tree = ET.fromstring(xml)
+    for entry in tree.iter('entry'):
+      test.check_call(['svn', 'add', '-q', entry.attrib.get('path')])
+    test.check_call(['svn', 'commit', '-m', self.message])
+    test.check_call(['svn', 'update'])
+
+class BranchAction(Action):
+  def __init__(self, name):
+    self.name = name
+
+class CreateBranch(BranchAction):
+  """Create a new branch based on the current branch and switch to it"""
+
+  def doGit(self, test):
+    test.check_call(['git', 'checkout', '-b', self.name])
+    test.working_head = self.name
+
+  def doHg(self, test):
+    test.check_call(['hg', 'branch', self.name])
+    test.working_head = self.name
+
+  def doSvn(self, test):
+    xml = test.check_output(['svn', 'info', '--xml'])
+    tree = ET.fromstring(xml)
+    url1 = tree.find('entry').find('url').text
+    url2 = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'copy', url1, url2, '-m', 'create branch ' + self.name])
+    test.check_call(['svn', 'switch', url2])
+    test.working_head = self.name
+
+class CreateUnrelatedBranch(BranchAction):
+  """Create a new branch unrelated to any other branch and switch to it"""
+
+  def doGit(self, test):
+    test.check_call(['git', 'checkout', '--orphan', self.name])
+    test.check_call(['git', 'rm', '-rf', '.'])
+    test.working_head = self.name
+
+  def doHg(self, test):
+    test.check_call(['hg', 'update', 'null'])
+    test.check_call(['hg', 'branch', self.name])
+    test.working_head = self.name
+
+  def doSvn(self, test):
+    url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'mkdir', url, '-m', 'create branch ' + self.name])
+    test.check_call(['svn', 'switch', url])
+    test.working_head = self.name
+
+class DeleteBranch(BranchAction):
+  """Delete/close a branch and push"""
+
+  def doGit(self, test):
+    test.check_call(['git', 'branch', '-d', self.name])
+    test.check_call(['git', 'push', 'origin', ':' + self.name])
+
+  def doHg(self, test):
+    test.check_call(['hg', 'update', self.name])
+    test.check_call(['hg', 'commit', '--close-branch', '-m', 'close branch ' + self.name])
+    test.check_call(['hg', 'push'])
+    test.check_call(['hg', 'update', test.working_head])
+
+  def doSvn(self, test):
+    url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'delete', url, '-m', 'delete branch ' + self.name])
+
+class SwitchBranch(BranchAction):
+  """Switch working copy to another branch"""
+
+  def doGit(self, test):
+    test.check_call(['git', 'checkout', self.name])
+    test.working_head = self.name
+
+  def doHg(self, test):
+    test.check_call(['hg', 'update', self.name])
+    test.working_head = self.name
+
+  def doSvn(self, test):
+    url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'switch', url])
+    test.working_head = self.name
+
+class Merge(BranchAction):
+  """Merge and push"""
+
+  def doGit(self, test):
+    test.check_call(['git', 'merge', '--no-ff', self.name])
+    test.check_call(['git', 'push', 'origin', self.name])
+
+  def doHg(self, test):
+    test.check_call(['hg', 'merge', self.name])
+    test.check_call(['hg', 'push'])
+
+  def doSvn(self, test):
+    url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'merge', url])
+    test.check_call(['svn', 'commit', '-m', 'merge from %s to %s' % (self.name, test.working_head)])
+
+class ReintegrateMerge(Merge):
+  """Merge and push"""
+
+  def doSvn(self, test):
+    url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
+    test.check_call(['svn', 'merge', '--reintegrate', url])
+    test.check_call(['svn', 'commit', '-m', 'reintegrate merge from %s to %s' % (self.name, test.working_head)])
+
+class CreateTag(Action):
+  """Create tag and push"""
+
+  def __init__(self, name):
+    self.name = name
+
+  def doGit(self, test):
+    test.check_call(['git', 'tag', self.name, '-m', 'create tag ' + self.name])
+    test.check_call(['git', 'push', 'origin', self.name])
+
+  def doHg(self, test):
+    test.check_call(['hg', 'tag', self.name, '-m', 'create tag ' + self.name])
+    test.check_call(['hg', 'push'])
+
+  def doSvn(self, test):
+    xml = test.check_output(['svn', 'info', '--xml'])
+    tree = ET.fromstring(xml)
+    url1 = tree.find('entry').find('url').text
+    url2 = 'file://' + test.main_path + '/' + test.encode_tag(self.name)
+    test.check_call(['svn', 'copy', url1, url2, '-m', 'create tag ' + self.name])
+
+
+### TEST CASE: EmptyTest ###
 
 class EmptyTest(object):
   @classmethod
@@ -174,251 +381,7 @@ class EmptyTest(object):
     correct = True
     self.assertEqual(result, correct)
 
-class BasicTest(object):
-  @classmethod
-  def setUpWorkingCopy(cls, working_path):
-    with open(os.path.join(working_path, 'a'), 'w') as f:
-      f.write('Pisgah')
-    os.chmod(os.path.join(working_path, 'a'), 0644)
-    os.symlink('a', os.path.join(working_path, 'b'))
-    os.mkdir(os.path.join(working_path, 'c'))
-    os.mkdir(os.path.join(working_path, 'c', 'd'))
-    with open(os.path.join(working_path, 'c', 'd', 'e'), 'w') as f:
-      f.write('Denali')
-    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
-    os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
-    yield 'commit 1'
-
-  def test_empty(self):
-    result = self.repo.empty()
-    correct = False
-    self.assertEqual(result, correct)
-
-  def test_ls1(self):
-    result = self.repo.ls(self.head, '')
-    correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls2(self):
-    result = self.repo.ls(self.head, '/')
-    correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls3(self):
-    result = self.repo.ls(self.head, '/a')
-    correct = [{'type':'f'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls4(self):
-    result = self.repo.ls(self.head, '/b')
-    correct = [{'type':'l'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls5(self):
-    result = self.repo.ls(self.head, '/c')
-    correct = [
-      {'name':'d', 'type':'d'}
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls6(self):
-    result = self.repo.ls(self.head, '/c/')
-    correct = [
-      {'name':'d', 'type':'d'}
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls7(self):
-    result = self.repo.ls(self.head, '/c', directory=True)
-    correct = [{'type':'d'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls8(self):
-    result = self.repo.ls(self.head, '/c/', directory=True)
-    correct = [{'type':'d'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls9(self):
-    result = self.repo.ls(self.head, '/', directory=True)
-    correct = [{'type':'d'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls10(self):
-    result = self.repo.ls(self.head, '/a', directory=True)
-    correct = [{'type':'f'}]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_error1(self):
-    self.assertRaises(PathDoesNotExist, self.repo.ls, self.head, '/z')
-
-  def test_ls_error2(self):
-    self.assertRaises(PathDoesNotExist, self.repo.ls, self.head, '/a/')
-
-  def test_ls_recursive(self):
-    result = self.repo.ls(self.head, '/', recursive=True)
-    correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c/d/e', 'type':'f'},
-      {'name':'c/d/f', 'type':'l'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_recursive_dirs(self):
-    result = self.repo.ls(self.head, '/', recursive=True, recursive_dirs=True)
-    correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-      {'name':'c/d', 'type':'d'},
-      {'name':'c/d/e', 'type':'f'},
-      {'name':'c/d/f', 'type':'l'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_report_size(self):
-    result = self.repo.ls(self.head, '/', report=('size',))
-    correct = [
-      {'name':'a', 'type':'f', 'size':6},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_report_target(self):
-    result = self.repo.ls(self.head, '/', report=('target',))
-    correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l', 'target':'a'},
-      {'name':'c', 'type':'d'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_report_executable1(self):
-    result = self.repo.ls(self.head, '/', report=('executable',))
-    correct = [
-      {'name':'a', 'type':'f', 'executable':False},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_ls_report_executable2(self):
-    result = self.repo.ls(self.head, '/c/d', report=('executable',))
-    correct = [
-      {'name':'e', 'type':'f', 'executable':True},
-      {'name':'f', 'type':'l'},
-    ]
-    self.assertEqual(normalize_ls(result), normalize_ls(correct))
-
-  def test_cat1(self):
-    result = self.repo.cat(self.head, 'a')
-    correct = 'Pisgah'
-    self.assertEqual(result, correct)
-
-  def test_cat2(self):
-    result = self.repo.cat(self.head, '/a')
-    correct = 'Pisgah'
-    self.assertEqual(result, correct)
-
-  def test_cat3(self):
-    result = self.repo.cat(self.head, 'c/d/e')
-    correct = 'Denali'
-    self.assertEqual(result, correct)
-
-  def test_cat4(self):
-    result = self.repo.cat(self.head, '/c/d/e')
-    correct = 'Denali'
-    self.assertEqual(result, correct)
-
-  def test_cat_error1(self):
-    self.assertRaises(PathDoesNotExist, self.repo.cat, self.head, '/z')
-
-  def test_cat_error2(self):
-    self.assertRaises(PathDoesNotExist, self.repo.cat, self.head, '/a/')
-
-  def test_cat_error3(self):
-    self.assertRaises(BadFileType, self.repo.cat, self.head, '/b')
-
-  def test_cat_error4(self):
-    self.assertRaises(BadFileType, self.repo.cat, self.head, '/c')
-
-  def test_readlink1(self):
-    result = self.repo.readlink(self.head, 'b')
-    correct = 'a'
-    self.assertEqual(result, correct)
-
-  def test_readlink2(self):
-    result = self.repo.readlink(self.head, '/b')
-    correct = 'a'
-    self.assertEqual(result, correct)
-
-  def test_readlink3(self):
-    result = self.repo.readlink(self.head, 'c/d/f')
-    correct = 'e'
-    self.assertEqual(result, correct)
-
-  def test_readlink4(self):
-    result = self.repo.readlink(self.head, '/c/d/f')
-    correct = 'e'
-    self.assertEqual(result, correct)
-
-  def test_readlink_error1(self):
-    self.assertRaises(PathDoesNotExist, self.repo.readlink, self.head, '/z')
-
-  def test_readlink_error2(self):
-    self.assertRaises(BadFileType, self.repo.readlink, self.head, '/a')
-
-  def test_readlink_error3(self):
-    self.assertRaises(PathDoesNotExist, self.repo.readlink, self.head, '/b/')
-
-  def test_readlink_error4(self):
-    self.assertRaises(BadFileType, self.repo.readlink, self.head, '/c')
-
-  def test_log1(self):
-    result = self.repo.log(revrange=self.head)
-    correct = self.commits[0]
-    self.assertIsInstance(result, CommitLogEntry)
-    self.assertCommitLogEqual(result, correct)
-
-  def test_log2(self):
-    result = self.repo.log()
-    correct = self.commits
-    self.assertGreaterEqual(len(result), len(correct))
-    for result_i, correct_i in zip(result, correct):
-      self.assertCommitLogEqual(result_i, correct_i)
-
-  def test_log3(self):
-    result = self.repo.log(revrange=(self.zerocommit, None))
-    correct = self.commits
-    self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-    for result_i, correct_i in zip(result, correct):
-      self.assertCommitLogEqual(result_i, correct_i)
-
-  def test_log4(self):
-    result = self.repo.log(revrange=(self.zerocommit, self.head))
-    correct = self.commits
-    self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-    for result_i, correct_i in zip(result, correct):
-      self.assertCommitLogEqual(result_i, correct_i)
-
-  def test_log5(self):
-    result = self.repo.log(limit=1)
-    correct = self.commits[0:1]
-    self.assertEqual(len(result), 1)
-    for result_i, correct_i in zip(result, correct):
-      self.assertCommitLogEqual(result_i, correct_i)
-
-
-class EmptyGitTest(GitTest, EmptyTest):
+class GitEmptyTest(GitTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = []
@@ -438,7 +401,7 @@ class EmptyGitTest(GitTest, EmptyTest):
     result = self.repo.log()
     self.assertEqual(len(result), 0)
 
-class EmptyHgTest(HgTest, EmptyTest):
+class HgEmptyTest(HgTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = []
@@ -463,7 +426,7 @@ class EmptyHgTest(HgTest, EmptyTest):
     result = self.repo.log()
     self.assertEqual(len(result), 0)
 
-class EmptySvnTest(SvnTest, EmptyTest):
+class SvnEmptyTest(SvnTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = []
@@ -484,7 +447,253 @@ class EmptySvnTest(SvnTest, EmptyTest):
     self.assertEqual(len(result), 1)
     self.assertEqual(result[0].rev, 0)
 
-class BasicGitTest(GitTest, BasicTest):
+
+### TEST CASE: BasicTest ###
+
+class BasicTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    with open(os.path.join(working_path, 'a'), 'w') as f:
+      f.write('Pisgah')
+    os.chmod(os.path.join(working_path, 'a'), 0644)
+    os.symlink('a', os.path.join(working_path, 'b'))
+    os.mkdir(os.path.join(working_path, 'c'))
+    os.mkdir(os.path.join(working_path, 'c', 'd'))
+    with open(os.path.join(working_path, 'c', 'd', 'e'), 'w') as f:
+      f.write('Denali')
+    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
+    os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
+    yield Commit('commit 1')
+
+  def test_empty(self):
+    result = self.repo.empty()
+    correct = False
+    self.assertEqual(result, correct)
+
+  def test_ls1(self):
+    result = self.repo.ls(self.main_branch, '')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'l'},
+      {'name':'c', 'type':'d'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls2(self):
+    result = self.repo.ls(self.main_branch, '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'l'},
+      {'name':'c', 'type':'d'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls3(self):
+    result = self.repo.ls(self.main_branch, '/a')
+    correct = [{'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls4(self):
+    result = self.repo.ls(self.main_branch, '/b')
+    correct = [{'type':'l'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls5(self):
+    result = self.repo.ls(self.main_branch, '/c')
+    correct = [
+      {'name':'d', 'type':'d'}
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls6(self):
+    result = self.repo.ls(self.main_branch, '/c/')
+    correct = [
+      {'name':'d', 'type':'d'}
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls7(self):
+    result = self.repo.ls(self.main_branch, '/c', directory=True)
+    correct = [{'type':'d'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls8(self):
+    result = self.repo.ls(self.main_branch, '/c/', directory=True)
+    correct = [{'type':'d'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls9(self):
+    result = self.repo.ls(self.main_branch, '/', directory=True)
+    correct = [{'type':'d'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls10(self):
+    result = self.repo.ls(self.main_branch, '/a', directory=True)
+    correct = [{'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_error1(self):
+    self.assertRaises(PathDoesNotExist, self.repo.ls, self.main_branch, '/z')
+
+  def test_ls_error2(self):
+    self.assertRaises(PathDoesNotExist, self.repo.ls, self.main_branch, '/a/')
+
+  def test_ls_recursive(self):
+    result = self.repo.ls(self.main_branch, '/', recursive=True)
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'l'},
+      {'name':'c/d/e', 'type':'f'},
+      {'name':'c/d/f', 'type':'l'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_recursive_dirs(self):
+    result = self.repo.ls(self.main_branch, '/', recursive=True, recursive_dirs=True)
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'l'},
+      {'name':'c', 'type':'d'},
+      {'name':'c/d', 'type':'d'},
+      {'name':'c/d/e', 'type':'f'},
+      {'name':'c/d/f', 'type':'l'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_report_size(self):
+    result = self.repo.ls(self.main_branch, '/', report=('size',))
+    correct = [
+      {'name':'a', 'type':'f', 'size':6},
+      {'name':'b', 'type':'l'},
+      {'name':'c', 'type':'d'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_report_target(self):
+    result = self.repo.ls(self.main_branch, '/', report=('target',))
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'l', 'target':'a'},
+      {'name':'c', 'type':'d'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_report_executable1(self):
+    result = self.repo.ls(self.main_branch, '/', report=('executable',))
+    correct = [
+      {'name':'a', 'type':'f', 'executable':False},
+      {'name':'b', 'type':'l'},
+      {'name':'c', 'type':'d'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_report_executable2(self):
+    result = self.repo.ls(self.main_branch, '/c/d', report=('executable',))
+    correct = [
+      {'name':'e', 'type':'f', 'executable':True},
+      {'name':'f', 'type':'l'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_cat1(self):
+    result = self.repo.cat(self.main_branch, 'a')
+    correct = 'Pisgah'
+    self.assertEqual(result, correct)
+
+  def test_cat2(self):
+    result = self.repo.cat(self.main_branch, '/a')
+    correct = 'Pisgah'
+    self.assertEqual(result, correct)
+
+  def test_cat3(self):
+    result = self.repo.cat(self.main_branch, 'c/d/e')
+    correct = 'Denali'
+    self.assertEqual(result, correct)
+
+  def test_cat4(self):
+    result = self.repo.cat(self.main_branch, '/c/d/e')
+    correct = 'Denali'
+    self.assertEqual(result, correct)
+
+  def test_cat_error1(self):
+    self.assertRaises(PathDoesNotExist, self.repo.cat, self.main_branch, '/z')
+
+  def test_cat_error2(self):
+    self.assertRaises(PathDoesNotExist, self.repo.cat, self.main_branch, '/a/')
+
+  def test_cat_error3(self):
+    self.assertRaises(BadFileType, self.repo.cat, self.main_branch, '/b')
+
+  def test_cat_error4(self):
+    self.assertRaises(BadFileType, self.repo.cat, self.main_branch, '/c')
+
+  def test_readlink1(self):
+    result = self.repo.readlink(self.main_branch, 'b')
+    correct = 'a'
+    self.assertEqual(result, correct)
+
+  def test_readlink2(self):
+    result = self.repo.readlink(self.main_branch, '/b')
+    correct = 'a'
+    self.assertEqual(result, correct)
+
+  def test_readlink3(self):
+    result = self.repo.readlink(self.main_branch, 'c/d/f')
+    correct = 'e'
+    self.assertEqual(result, correct)
+
+  def test_readlink4(self):
+    result = self.repo.readlink(self.main_branch, '/c/d/f')
+    correct = 'e'
+    self.assertEqual(result, correct)
+
+  def test_readlink_error1(self):
+    self.assertRaises(PathDoesNotExist, self.repo.readlink, self.main_branch, '/z')
+
+  def test_readlink_error2(self):
+    self.assertRaises(BadFileType, self.repo.readlink, self.main_branch, '/a')
+
+  def test_readlink_error3(self):
+    self.assertRaises(PathDoesNotExist, self.repo.readlink, self.main_branch, '/b/')
+
+  def test_readlink_error4(self):
+    self.assertRaises(BadFileType, self.repo.readlink, self.main_branch, '/c')
+
+  #def test_log1(self):
+  #  result = self.repo.log(revrange=self.main_branch)
+  #  correct = self.commits[0]
+  #  self.assertIsInstance(result, CommitLogEntry)
+  #  self.assertCommitLogEqual(result, correct)
+
+  #def test_log2(self):
+  #  result = self.repo.log()
+  #  correct = self.commits
+  #  self.assertGreaterEqual(len(result), len(correct))
+  #  for result_i, correct_i in zip(result, correct):
+  #    self.assertCommitLogEqual(result_i, correct_i)
+
+  #def test_log3(self):
+  #  result = self.repo.log(revrange=(self.zerocommit, None))
+  #  correct = self.commits
+  #  self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
+  #  for result_i, correct_i in zip(result, correct):
+  #    self.assertCommitLogEqual(result_i, correct_i)
+
+  #def test_log4(self):
+  #  result = self.repo.log(revrange=(self.zerocommit, self.main_branch))
+  #  correct = self.commits
+  #  self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
+  #  for result_i, correct_i in zip(result, correct):
+  #    self.assertCommitLogEqual(result_i, correct_i)
+
+  #def test_log5(self):
+  #  result = self.repo.log(limit=1)
+  #  correct = self.commits[0:1]
+  #  self.assertEqual(len(result), 1)
+  #  for result_i, correct_i in zip(result, correct):
+  #    self.assertCommitLogEqual(result_i, correct_i)
+
+class GitBasicTest(GitTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = ['master']
@@ -500,7 +709,7 @@ class BasicGitTest(GitTest, BasicTest):
     correct = ['master',]
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
 
-class BasicHgTest(HgTest, BasicTest):
+class HgBasicTest(HgTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = ['default']
@@ -521,7 +730,7 @@ class BasicHgTest(HgTest, BasicTest):
     correct = ['default', 'tip']
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
 
-class BasicSvnTest(SvnTest, BasicTest):
+class SvnBasicTest(SvnTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = []
@@ -536,6 +745,93 @@ class BasicSvnTest(SvnTest, BasicTest):
     result = self.repo.heads()
     correct = ['HEAD']
     self.assertEqual(result, correct)
+
+
+### TEST CASE: UnrelatedBranchTest ###
+
+class UnrelatedBranchTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    yield CreateStandardDirectoryStructure()
+    with open(os.path.join(working_path, 'a'), 'w') as f:
+      f.write('spoon')
+    yield Commit('modify a')
+    yield CreateUnrelatedBranch('branch1')
+    with open(os.path.join(working_path, 'b'), 'w') as f:
+      f.write('fish')
+    yield Commit('modify b')
+
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
+    self.assertEqual(sorted(result), sorted(correct))
+
+  def test_ancestor(self):
+    result = self.repo.ancestor(
+      self.encode_branch(self.main_branch),
+      self.encode_branch('branch1'))
+    correct = None
+    self.assertEqual(result, correct)
+
+  def test_main_ls(self):
+    result = self.repo.ls(self.main_branch, '/')
+    correct = [{'name':'a', 'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_branch1_ls(self):
+    result = self.repo.ls(self.encode_branch('branch1'), '/')
+    correct = [{'name':'b', 'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+class GitUnrelatedBranchTest(GitTest, UnrelatedBranchTest): pass
+class HgUnrelatedBranchTest(HgTest, UnrelatedBranchTest): pass
+class SvnUnrelatedBranchTest(SvnTest, UnrelatedBranchTest): pass
+
+
+### TEST CASE: BranchTest1 ###
+
+class BranchTest1(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    yield CreateStandardDirectoryStructure()
+    with open(os.path.join(working_path, 'a'), 'w') as f:
+      f.write('step 2\n')
+    yield Commit('modify a')
+    cls.ancestor1 = cls.getAbsoluteRev()
+    yield CreateBranch('branch1')
+    with open(os.path.join(working_path, 'b'), 'a') as f:
+      f.write('step 4\n')
+    yield Commit('modify b')
+
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
+    self.assertEqual(sorted(result), sorted(correct))
+
+  def test_ancestor(self):
+    result = self.repo.ancestor(
+      self.encode_branch(self.main_branch),
+      self.encode_branch('branch1'))
+    correct = self.ancestor1
+    self.assertEqual(result, correct)
+
+  def test_main_ls(self):
+    result = self.repo.ls(self.main_branch, '/')
+    correct = [{'name':'a', 'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_branch1_ls(self):
+    result = self.repo.ls(self.encode_branch('branch1'), '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'f'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+class GitBranchTest1(GitTest, BranchTest1): pass
+class HgBranchTest1(HgTest, BranchTest1): pass
+class SvnBranchTest1(SvnTest, BranchTest1): pass
+
 
 if __name__ == '__main__':
   unittest.main()
