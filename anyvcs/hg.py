@@ -199,4 +199,8 @@ class HgRepo(VCSRepo):
 
   def ancestor(self, rev1, rev2):
     cmd = [HG, 'log', '--template={node}', '-r', 'ancestor(%s, %s)' % (rev1, rev2)]
-    return self._command(cmd)
+    output = self._command(cmd)
+    if output == '':
+      return None
+    else:
+      return output
