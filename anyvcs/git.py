@@ -183,4 +183,4 @@ class GitRepo(VCSRepo):
 
   def ancestor(self, rev1, rev2):
     cmd = [GIT, 'merge-base', rev1, rev2]
-    return self._command(cmd)
+    return self._command(cmd).rstrip()
