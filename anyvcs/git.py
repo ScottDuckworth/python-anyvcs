@@ -146,11 +146,11 @@ class GitRepo(VCSRepo):
         cmd.append('--no-merges')
     single = False
     if revrange is None:
-      pass
+      cmd.append('--all')
     elif isinstance(revrange, tuple):
       if revrange[0] is None:
         if revrange[1] is None:
-          pass
+          cmd.append('--all')
         else:
           cmd.append(revrange[1])
       else:
