@@ -464,6 +464,7 @@ class BasicTest(object):
     os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
     os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
     yield Commit('commit 1')
+    cls.rev1 = cls.getAbsoluteRev()
 
   def test_empty(self):
     result = self.repo.empty()
@@ -659,39 +660,15 @@ class BasicTest(object):
   def test_readlink_error4(self):
     self.assertRaises(BadFileType, self.repo.readlink, self.main_branch, '/c')
 
-  #def test_log1(self):
-  #  result = self.repo.log(revrange=self.main_branch)
-  #  correct = self.commits[0]
-  #  self.assertIsInstance(result, CommitLogEntry)
-  #  self.assertCommitLogEqual(result, correct)
+  def test_log_head(self):
+    result = self.repo.log(revrange=self.main_branch)
+    self.assertIsInstance(result, CommitLogEntry)
+    self.assertEqual(result.rev, self.rev1)
 
-  #def test_log2(self):
-  #  result = self.repo.log()
-  #  correct = self.commits
-  #  self.assertGreaterEqual(len(result), len(correct))
-  #  for result_i, correct_i in zip(result, correct):
-  #    self.assertCommitLogEqual(result_i, correct_i)
-
-  #def test_log3(self):
-  #  result = self.repo.log(revrange=(self.zerocommit, None))
-  #  correct = self.commits
-  #  self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-  #  for result_i, correct_i in zip(result, correct):
-  #    self.assertCommitLogEqual(result_i, correct_i)
-
-  #def test_log4(self):
-  #  result = self.repo.log(revrange=(self.zerocommit, self.main_branch))
-  #  correct = self.commits
-  #  self.assertEqual(len(result), len(correct), 'len(%s) != len(%s)' % (result, correct))
-  #  for result_i, correct_i in zip(result, correct):
-  #    self.assertCommitLogEqual(result_i, correct_i)
-
-  #def test_log5(self):
-  #  result = self.repo.log(limit=1)
-  #  correct = self.commits[0:1]
-  #  self.assertEqual(len(result), 1)
-  #  for result_i, correct_i in zip(result, correct):
-  #    self.assertCommitLogEqual(result_i, correct_i)
+  def test_log_rev(self):
+    result = self.repo.log(revrange=self.rev1)
+    self.assertIsInstance(result, CommitLogEntry)
+    self.assertEqual(result.rev, self.rev1)
 
 class GitBasicTest(GitTest, BasicTest):
   def test_branches(self):
@@ -708,6 +685,13 @@ class GitBasicTest(GitTest, BasicTest):
     result = self.repo.heads()
     correct = ['master',]
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
+
+  def test_log_all(self):
+    result = self.repo.log()
+    self.assertIsInstance(result, list)
+    self.assertEqual(len(result), 1)
+    self.assertIsInstance(result[0], CommitLogEntry)
+    self.assertEqual(result[0].rev, self.rev1)
 
 class HgBasicTest(HgTest, BasicTest):
   def test_branches(self):
@@ -730,6 +714,13 @@ class HgBasicTest(HgTest, BasicTest):
     correct = ['default', 'tip']
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
 
+  def test_log_all(self):
+    result = self.repo.log()
+    self.assertIsInstance(result, list)
+    self.assertEqual(len(result), 1)
+    self.assertIsInstance(result[0], CommitLogEntry)
+    self.assertEqual(result[0].rev, self.rev1)
+
 class SvnBasicTest(SvnTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()
@@ -745,6 +736,13 @@ class SvnBasicTest(SvnTest, BasicTest):
     result = self.repo.heads()
     correct = ['HEAD']
     self.assertEqual(result, correct)
+
+  def test_log_all(self):
+    result = self.repo.log()
+    self.assertIsInstance(result, list)
+    self.assertEqual(len(result), 2)
+    self.assertIsInstance(result[0], CommitLogEntry)
+    self.assertEqual(result[0].rev, self.rev1)
 
 
 ### TEST CASE: UnrelatedBranchTest ###
