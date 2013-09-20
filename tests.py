@@ -787,49 +787,238 @@ class HgUnrelatedBranchTest(HgTest, UnrelatedBranchTest): pass
 class SvnUnrelatedBranchTest(SvnTest, UnrelatedBranchTest): pass
 
 
-### TEST CASE: BranchTest1 ###
+### TEST CASES: BranchTest* ###
 
-class BranchTest1(object):
+def setup_branch_test(test, step):
+  """Setup a typical branching scenario for testing.
+
+  step rev tree    branch     message                           ancestor
+     1   1   *     (main)     standard directory structure
+     2   2   *     (main)     modify a                          1=main
+     3   3   |\*   (branch1)  create branch1
+         4   | *   (branch1)  modify b
+     4   5   * |   (main)     modify c                          2=main
+     5   6 */| |   (branch2)  create branch2
+         7 * | |   (branch2)  modify c
+     6   8 | |\*   (branch1)  merge from main to branch1        3=branch1
+     7   9 | | |\* (branch1a) create branch1a
+        10 | | | * (branch1a) modify b
+     8  11 | | */| (branch1)  reintegrate branch1a into branch1
+     9  12 |\* | | (main)     reintegrate branch2 into main     4=main
+    10  13 | |\* | (branch1)  merge from main to branch1
+    11  14 | | * | (branch1)  modify a
+    12  15 | */| | (main)     reintegrate branch1 into main
+    13  16 X | | | (branch2)  delete branch2
+        17   | | X (branch1a) delete branch1a
+        18   | X   (branch1)  delete branch1
+
+  """
+  a_path = os.path.join(test.working_path, 'a')
+  b_path = os.path.join(test.working_path, 'b')
+  c_path = os.path.join(test.working_path, 'c')
+
+  if step < 1: return
+  yield CreateStandardDirectoryStructure()
+
+  if step < 2: return
+  with open(a_path, 'w') as f: f.write('step 2')
+  yield Commit('2: modify a')
+  test.ancestor1 = test.getAbsoluteRev()
+
+  if step < 3: return
+  yield CreateBranch('branch1')
+  with open(b_path, 'w') as f: f.write('step 3')
+  yield Commit('4: modify b')
+
+  if step < 4: return
+  yield SwitchBranch(test.main_branch)
+  with open(c_path, 'w') as f: f.write('step 4')
+  yield Commit('5: modify c')
+  test.ancestor2 = test.getAbsoluteRev()
+
+  if step < 5: return
+  yield CreateBranch('branch2')
+  with open(c_path, 'w') as f: f.write('step 5')
+  yield Commit('7: modify c')
+
+  if step < 6: return
+  yield SwitchBranch('branch1')
+  yield Merge(test.main_branch)
+  test.ancestor3 = test.getAbsoluteRev()
+
+  if step < 7: return
+  yield CreateBranch('branch1a')
+  with open(b_path, 'w') as f: f.write('step 7')
+  yield Commit('10: modify b')
+
+  if step < 8: return
+  yield SwitchBranch('branch1')
+  yield ReintegrateMerge('branch1a')
+
+  if step < 9: return
+  yield SwitchBranch(test.main_branch)
+  yield ReintegrateMerge('branch2')
+  test.ancestor4 = test.getAbsoluteRev()
+
+  if step < 10: return
+  yield SwitchBranch('branch1')
+  yield Merge(test.main_branch)
+
+  if step < 11: return
+  with open(a_path, 'w') as f: f.write('step 11')
+  yield Commit('14: modify a')
+
+  if step < 12: return
+  yield SwitchBranch(test.main_branch)
+  yield ReintegrateMerge('branch1')
+
+  if step < 13: return
+  yield DeleteBranch('branch2')
+  yield DeleteBranch('branch1a')
+  yield DeleteBranch('branch1')
+
+### TEST CASE: BranchTestStep3 ###
+
+class BranchTestStep3(object):
   @classmethod
   def setUpWorkingCopy(cls, working_path):
-    yield CreateStandardDirectoryStructure()
-    with open(os.path.join(working_path, 'a'), 'w') as f:
-      f.write('step 2\n')
-    yield Commit('modify a')
-    cls.ancestor1 = cls.getAbsoluteRev()
-    yield CreateBranch('branch1')
-    with open(os.path.join(working_path, 'b'), 'a') as f:
-      f.write('step 4\n')
-    yield Commit('modify b')
+    for action in setup_branch_test(cls, 3):
+      yield action
 
   def test_branches(self):
     result = self.repo.branches()
     correct = map(self.encode_branch, [self.main_branch, 'branch1'])
     self.assertEqual(sorted(result), sorted(correct))
 
-  def test_ancestor(self):
-    result = self.repo.ancestor(
-      self.encode_branch(self.main_branch),
-      self.encode_branch('branch1'))
+  def test_ancestor_main_branch1(self):
+    branch1 = self.encode_branch('branch1')
+    result = self.repo.ancestor(self.main_branch, branch1)
     correct = self.ancestor1
     self.assertEqual(result, correct)
 
-  def test_main_ls(self):
+  def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
     correct = [{'name':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(self.main_branch, '/a')
+    self.assertEqual(result, 'step 2')
 
-  def test_branch1_ls(self):
-    result = self.repo.ls(self.encode_branch('branch1'), '/')
+  def test_branch1(self):
+    branch1 = self.encode_branch('branch1')
+    result = self.repo.ls(branch1, '/')
     correct = [
       {'name':'a', 'type':'f'},
       {'name':'b', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(branch1, '/a')
+    self.assertEqual(result, 'step 2')
+    result = self.repo.cat(branch1, '/b')
+    self.assertEqual(result, 'step 3')
 
-class GitBranchTest1(GitTest, BranchTest1): pass
-class HgBranchTest1(HgTest, BranchTest1): pass
-class SvnBranchTest1(SvnTest, BranchTest1): pass
+class GitBranchTestStep3(GitTest, BranchTestStep3): pass
+class HgBranchTestStep3(HgTest, BranchTestStep3): pass
+class SvnBranchTestStep3(SvnTest, BranchTestStep3): pass
+
+### TEST CASE: BranchTestStep7 ###
+
+class BranchTestStep7(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    for action in setup_branch_test(cls, 7):
+      yield action
+
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = map(self.encode_branch,
+                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
+    self.assertEqual(sorted(result), sorted(correct))
+
+  def test_ancestor_main_branch1(self):
+    branch1 = self.encode_branch('branch1')
+    result = self.repo.ancestor(self.main_branch, branch1)
+    correct = self.ancestor2
+    self.assertEqual(result, correct)
+
+  def test_ancestor_main_branch1a(self):
+    branch1a = self.encode_branch('branch1a')
+    result = self.repo.ancestor(self.main_branch, branch1a)
+    correct = self.ancestor2
+    self.assertEqual(result, correct)
+
+  def test_ancestor_main_branch2(self):
+    branch2 = self.encode_branch('branch2')
+    result = self.repo.ancestor(self.main_branch, branch2)
+    correct = self.ancestor2
+    self.assertEqual(result, correct)
+
+  def test_ancestor_branch1_branch1a(self):
+    branch1 = self.encode_branch('branch1')
+    branch1a = self.encode_branch('branch1a')
+    result = self.repo.ancestor(branch1, branch1a)
+    correct = self.ancestor3
+    self.assertEqual(result, correct)
+
+  def test_main(self):
+    result = self.repo.ls(self.main_branch, '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'c', 'type':'f'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(self.main_branch, '/a')
+    self.assertEqual(result, 'step 2')
+    result = self.repo.cat(self.main_branch, '/c')
+    self.assertEqual(result, 'step 4')
+
+  def test_branch1(self):
+    branch1 = self.encode_branch('branch1')
+    result = self.repo.ls(branch1, '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'f'},
+      {'name':'c', 'type':'f'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(branch1, '/a')
+    self.assertEqual(result, 'step 2')
+    result = self.repo.cat(branch1, '/b')
+    self.assertEqual(result, 'step 3')
+    result = self.repo.cat(branch1, '/c')
+    self.assertEqual(result, 'step 4')
+
+  def test_branch1a(self):
+    branch1a = self.encode_branch('branch1a')
+    result = self.repo.ls(branch1a, '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'b', 'type':'f'},
+      {'name':'c', 'type':'f'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(branch1a, '/a')
+    self.assertEqual(result, 'step 2')
+    result = self.repo.cat(branch1a, '/b')
+    self.assertEqual(result, 'step 7')
+    result = self.repo.cat(branch1a, '/c')
+    self.assertEqual(result, 'step 4')
+
+  def test_branch2(self):
+    branch2 = self.encode_branch('branch2')
+    result = self.repo.ls(branch2, '/')
+    correct = [
+      {'name':'a', 'type':'f'},
+      {'name':'c', 'type':'f'},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+    result = self.repo.cat(branch2, '/a')
+    self.assertEqual(result, 'step 2')
+    result = self.repo.cat(branch2, '/c')
+    self.assertEqual(result, 'step 5')
+
+class GitBranchTestStep7(GitTest, BranchTestStep7): pass
+class HgBranchTestStep7(HgTest, BranchTestStep7): pass
+class SvnBranchTestStep7(SvnTest, BranchTestStep7): pass
 
 
 if __name__ == '__main__':
