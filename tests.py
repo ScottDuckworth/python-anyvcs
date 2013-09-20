@@ -327,10 +327,11 @@ class Merge(BranchAction):
 
   def doGit(self, test):
     test.check_call(['git', 'merge', '--no-ff', self.name])
-    test.check_call(['git', 'push', 'origin', self.name])
+    test.check_call(['git', 'push', 'origin', test.working_head])
 
   def doHg(self, test):
     test.check_call(['hg', 'merge', self.name])
+    test.check_call(['hg', 'commit', '-m', 'merge from %s to %s' % (self.name, test.working_head)])
     test.check_call(['hg', 'push'])
 
   def doSvn(self, test):
