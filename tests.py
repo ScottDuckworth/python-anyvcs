@@ -1451,7 +1451,7 @@ class SvnBranchTestStep11(SvnTest, BranchTestStep11):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(12, -1, -1)
+    correct = range(14, -1, -1)
     self.assertEqual(result, correct)
 
   def test_log_None_main(self):
@@ -1547,7 +1547,7 @@ class SvnBranchTestStep13(SvnTest, BranchTestStep13):
 
   def test_log_None_main(self):
     result = [x.rev for x in self.repo.log(revrange=(None, self.main_branch))]
-    correct = range(15, -1, -1)
+    correct = range(15, 0, -1)
     self.assertEqual(result, correct)
 
 
