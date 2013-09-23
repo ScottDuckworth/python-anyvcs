@@ -1453,6 +1453,12 @@ class GitLikeBranchTestStep11(BranchTestStep11):
     correct = [14, 10, 7, 5, 4, 2]
     self.assertEqual(result, correct)
 
+  def test_log_None_branch1_path_b(self):
+    branch1 = self.encode_branch('branch1')
+    result = [self.revrev[x.rev] for x in self.repo.log(revrange=(None, branch1), path='/b')]
+    correct = [10, 4]
+    self.assertEqual(result, correct)
+
   def test_log_main_branch1(self):
     branch1 = self.encode_branch('branch1')
     result = [self.revrev[x.rev] for x in self.repo.log(revrange=(self.main_branch, branch1))]
@@ -1499,6 +1505,12 @@ class SvnBranchTestStep11(SvnTest, BranchTestStep11):
     branch1 = self.encode_branch('branch1')
     result = [x.rev for x in self.repo.log(revrange=(None, branch1), merges=True)]
     correct = [14, 10, 9, 7, 6, 5, 4, 3, 2, 1]
+    self.assertEqual(result, correct)
+
+  def test_log_None_branch1_path_b(self):
+    branch1 = self.encode_branch('branch1')
+    result = [x.rev for x in self.repo.log(revrange=(None, branch1), path='/b')]
+    correct = [10, 4]
     self.assertEqual(result, correct)
 
   def test_log_main_branch1(self):
