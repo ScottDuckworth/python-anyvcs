@@ -9,8 +9,10 @@ SVNLOOK = 'svnlook'
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
+changed_copy_info_rx = re.compile(r'^    \(from (?P<path>.+):r(?P<rev>\d+)\)')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
+ChangeInfo = collections.namedtuple('ChangeInfo', 'status copy')
 
 class SvnRepo(VCSRepo):
   @classmethod
@@ -228,39 +230,58 @@ class SvnRepo(VCSRepo):
           path=None, follow=False):
     if revrange is None or revrange == (None, None):
       results = []
-      for rev, path in self._history(self.youngest(), '/', limit):
-        results.append(self._logentry(rev, '/'))
+      for rev, prefix in self._history(self.youngest(), '/', limit):
+        results.append(self._logentry(rev, prefix))
       return results
     elif isinstance(revrange, tuple):
+      path_filter = None
       if revrange[1] is None:
         include = set()
         rev1 = self.youngest()
         for head in self.heads():
           if head == 'HEAD':
             continue
-          path1 = type(self).cleanPath(head)
-          include.update(self._mergehistory(rev1, path1))
+          prefix1 = type(self).cleanPath(head)
+          include.update(self._mergehistory(rev1, prefix1))
       else:
-        rev1, path1 = self._maprev(revrange[1])
+        rev1, prefix1 = self._maprev(revrange[1])
         if firstparent:
-          include = self._history(rev1, path1)
+          include = self._history(rev1, prefix1)
         else:
-          include = self._mergehistory(rev1, path1)
+          include = self._mergehistory(rev1, prefix1)
+        if path is not None:
+          path_filter = set([(type(self).cleanPath(prefix1), 0, rev1)])
       if revrange[0] is None:
         results = include
       else:
-        rev0, path0 = self._maprev(revrange[0])
-        exclude = self._mergehistory(rev0, path0)
+        rev0, prefix0 = self._maprev(revrange[0])
+        exclude = self._mergehistory(rev0, prefix0)
         results = include - exclude
       results = sorted(results, key=lambda x: x.rev, reverse=True)
+      if path_filter is not None:
+        path = type(self).cleanPath(path)
+        _results = []
+        for r in results:
+          changed = self._changed(r.rev)
+          merge = set()
+          for prefix, minrev, maxrev in path_filter:
+            if minrev <= r.rev <= maxrev:
+              fullpath = prefix + path
+              if fullpath in changed:
+                merges = self._mergeinfo(r.rev, prefix)
+                merge.update(merges)
+                _results.append(r)
+                continue
+          path_filter.update(merge)
+        results = _results
       if limit is not None:
         results = results[:limit]
       return map(lambda x: self._logentry(x.rev, x.path), results)
     else:
-      rev, path = self._maprev(revrange)
-      h = self._history(rev, path, 1)
+      rev, prefix = self._maprev(revrange)
+      h = self._history(rev, prefix, 1)
       rev = h[0].rev
-      return self._logentry(rev, path)
+      return self._logentry(rev, prefix)
 
   def _logentry(self, rev, path, history=None):
     revstr = str(rev)
@@ -288,6 +309,27 @@ class SvnRepo(VCSRepo):
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
+
+  def _changed(self, rev):
+    cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
+    output = self._command(cmd)
+    lines = output.splitlines()
+    lines.reverse()
+    results = {}
+    while lines:
+      line = lines.pop()
+      status = line[:3]
+      path = '/' + line[4:].lstrip('/')
+      copy = None
+      if status.endswith('+'):
+        line = lines.pop()
+        m = changed_copy_info_rx.match(line)
+        assert m
+        rev, p = m.group('rev', 'path')
+        p = '/' + path.lstrip('/')
+        copy = HistoryEntry(int(rev), p)
+      results[path] = ChangeInfo(status, copy)
+    return results
 
   def _history(self, rev, path, limit=None):
     cmd = [SVNLOOK, 'history', '.', '-r', str(rev), path]
