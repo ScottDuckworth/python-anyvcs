@@ -242,7 +242,10 @@ class SvnRepo(VCSRepo):
           include.update(self._mergehistory(rev1, path1))
       else:
         rev1, path1 = self._maprev(revrange[1])
-        include = self._mergehistory(rev1, path1)
+        if firstparent:
+          include = self._history(rev1, path1)
+        else:
+          include = self._mergehistory(rev1, path1)
       if revrange[0] is None:
         results = include
       else:
