@@ -226,54 +226,62 @@ class SvnRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    if revrange is None:
-      revrange = (None, None)
-    single = False
-    if isinstance(revrange, tuple):
-      if revrange[0] is None:
-        startrev = None
-      else:
-        startrev = int(revrange[0])
+    if revrange is None or revrange == (None, None):
+      results = []
+      for rev, path in self._history(self.youngest(), '/', limit):
+        results.append(self._logentry(rev, '/'))
+      return results
+    elif isinstance(revrange, tuple):
       if revrange[1] is None:
-        endrev = self.youngest()
+        include = set()
+        rev1 = self.youngest()
+        for head in self.heads():
+          if head == 'HEAD':
+            continue
+          path1 = type(self).cleanPath(head)
+          include.update(self._mergehistory(rev1, path1))
       else:
-        endrev = int(revrange[1])
-      cmd = [SVNLOOK, 'history', '.', '-r', str(endrev)]
+        rev1, path1 = self._maprev(revrange[1])
+        include = self._mergehistory(rev1, path1)
+      if revrange[0] is None:
+        results = include
+      else:
+        rev0, path0 = self._maprev(revrange[0])
+        exclude = self._mergehistory(rev0, path0)
+        results = include - exclude
+      results = sorted(results, key=lambda x: x.rev, reverse=True)
       if limit is not None:
-        cmd.extend(['-l', str(limit)])
-      elif startrev is not None:
-        cmd.extend(['-l', str(endrev - startrev)])
-      output = self._command(cmd)
-
-      revs = []
-      consume = endrev is None
-      for line in output.splitlines()[2:]:
-        rev = int(line.split()[0])
-        if not consume and rev != endrev:
-          continue
-        consume = True
-        if rev == startrev:
-          break
-        revs.append(rev)
+        results = results[:limit]
+      return map(lambda x: self._logentry(x.rev, x.path), results)
     else:
-      revs = [int(revrange)]
-      single = True
+      rev, path = self._maprev(revrange)
+      h = self._history(rev, path, 1)
+      rev = h[0].rev
+      return self._logentry(rev, path)
 
-    results = []
-    for rev in revs:
-      cmd = [SVNLOOK, 'info', '.', '-r', str(rev)]
-      output = self._command(cmd)
-      author, date, logsize, message = output.split('\n', 3)
-      if rev == 0:
-        parents = []
+  def _logentry(self, rev, path, history=None):
+    revstr = str(rev)
+    cmd = [SVNLOOK, 'info', '.', '-r', revstr]
+    output = self._command(cmd)
+    author, date, logsize, message = output.split('\n', 3)
+    date = parse_isodate(date)
+    if history is None:
+      history = self._history(rev, path, 2)
+    parents = []
+    if len(history) > 1:
+      prev = history[1].rev
+      if path == '/':
+        parents.append(prev)
       else:
-        parents = [rev - 1]
-      date = parse_isodate(date)
-      entry = CommitLogEntry(rev, parents, date, author, message)
-      if single:
-        return entry
-      results.append(entry)
-    return results
+        parents.append('%s:%d' % (path, prev))
+      for head, minrev, maxrev in self._mergeinfo(rev, path):
+        if prev < maxrev:
+          h = self._history(maxrev, head, 1)
+          if head == '/':
+            parents.append(h[0].rev)
+          else:
+            parents.append('%s:%d' % (head, h[0].rev))
+    return CommitLogEntry(rev, parents, date, author, message)
 
   def diff(self, rev_a, rev_b, path_a, path_b=None):
     raise NotImplementedError
@@ -287,6 +295,19 @@ class SvnRepo(VCSRepo):
     for line in output.splitlines()[2:]:
       r, p = line.split(None, 1)
       results.append(HistoryEntry(int(r), p))
+    return results
+
+  def _mergehistory(self, rev, path, limit=None):
+    results = set(self._history(rev, path, limit))
+    for head, minrev, maxrev in self._mergeinfo(rev, path):
+      l = maxrev - minrev + 1
+      if limit is not None:
+        l = min(l, limit)
+      h = self._history(maxrev, head, l)
+      for r, p in h:
+        if r < minrev:
+          break
+        results.add(HistoryEntry(r, p))
     return results
 
   def ancestor(self, rev1, rev2):
