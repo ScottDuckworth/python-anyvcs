@@ -89,6 +89,10 @@ class VCSTest(unittest.TestCase):
     raise NotImplementedError
 
   @classmethod
+  def export(cls, rev, path):
+    raise NotImplementedError
+
+  @classmethod
   def tearDownClass(cls):
     if not keep_test_dir:
       shutil.rmtree(cls.dir)
@@ -136,6 +140,17 @@ class GitTest(VCSTest):
     except subprocess.CalledProcessError:
       return None
 
+  @classmethod
+  def export(cls, rev, path):
+    os.mkdir(path)
+    cmd1 = ['git', 'archive', rev]
+    data = check_output(cmd1, cwd=cls.main_path)
+    cmd2 = ['tar', '-x', '-C', path]
+    p = subprocess.Popen(cmd2, stdin=subprocess.PIPE)
+    p.communicate(data)
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, cmd2)
+
 class HgTest(VCSTest):
   @classmethod
   def setUpRepos(cls):
@@ -149,6 +164,13 @@ class HgTest(VCSTest):
   @classmethod
   def getAbsoluteRev(cls):
     return cls.check_output(['hg', 'log', '-l1', '--template={node}'])
+
+  @classmethod
+  def export(cls, rev, path):
+    check_call(['hg', 'archive', '-r', str(rev), path], cwd=cls.main_path)
+    trash = os.path.join(path, '.hg_archival.txt')
+    if os.path.exists(trash):
+      os.unlink(trash)
 
 class SvnTest(VCSTest):
   @classmethod
@@ -169,6 +191,12 @@ class SvnTest(VCSTest):
       return int(rev)
     else:
       return '/%s:%s' % (cls.encode_branch(cls.working_head), rev)
+
+  @classmethod
+  def export(cls, rev, path):
+    rev, prefix = cls.repo._maprev(rev)
+    url = 'file://%s/%s@%d' % (cls.main_path, prefix, rev)
+    check_call(['svn', 'export', url, path])
 
   @classmethod
   def encode_branch(cls, s):
@@ -1115,6 +1143,19 @@ class BranchTestStep7(object):
     self.assertEqual(result, 'step 2')
     result = self.repo.cat(branch2, '/c')
     self.assertEqual(result, 'step 5')
+
+  def test_diff_main_branch1a(self):
+    branch1a = self.encode_branch('branch1a')
+    path_a = os.path.join(self.dir, 'diff_main_branch1a_a')
+    path_b = os.path.join(self.dir, 'diff_main_branch1a_b')
+    self.export(self.main_branch, path_a)
+    self.export(branch1a, path_b)
+    diff = self.repo.diff(self.main_branch, branch1a)
+    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
+    p.communicate(diff)
+    self.assertEqual(p.returncode, 0)
+    rc = subprocess.call(['diff', '-urN', path_a, path_b])
+    self.assertEqual(rc, 0)
 
 class GitLikeBranchTestStep7(BranchTestStep7):
   def test_log_main(self):
