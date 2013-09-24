@@ -1503,7 +1503,7 @@ class SvnBranchTestStep11(SvnTest, BranchTestStep11):
 
   def test_log_None_branch1_nomerges(self):
     branch1 = self.encode_branch('branch1')
-    result = [x.rev for x in self.repo.log(revrange=(None, branch1), merges=True)]
+    result = [x.rev for x in self.repo.log(revrange=(None, branch1), merges=False)]
     correct = [14, 10, 9, 7, 6, 5, 4, 3, 2, 1]
     self.assertEqual(result, correct)
 
