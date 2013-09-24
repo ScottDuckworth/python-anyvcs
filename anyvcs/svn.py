@@ -281,8 +281,6 @@ class SvnRepo(VCSRepo):
         if merges:
           results = filter(lambda x: len(x.parents) > 1, results)
         else:
-          for x in results:
-            print x.rev, x.parents
           results = filter(lambda x: len(x.parents) <= 1, results)
       return results
     else:
