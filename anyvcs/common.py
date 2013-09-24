@@ -212,7 +212,13 @@ class VCSRepo(object):
     raise NotImplementedError
 
   @abstractmethod
-  def diff(self, rev_a, rev_b, path_a, path_b=None):
+  def diff(self, rev_a, rev_b, path=None):
+    """Diff of two revisions
+
+    Returns a string containing the unified diff from rev_a to rev_b with a
+    prefix of one (suitable for input to patch -p1). If path is not None, only
+    return the diff for that file.
+    """
     raise NotImplementedError
 
   @abstractmethod

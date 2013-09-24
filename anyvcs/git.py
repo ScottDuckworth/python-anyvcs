@@ -178,8 +178,11 @@ class GitRepo(VCSRepo):
       results.append(entry)
     return results
 
-  def diff(self, rev_a, rev_b, path_a, path_b=None):
-    raise NotImplementedError
+  def diff(self, rev_a, rev_b, path=None):
+    cmd = [GIT, 'diff', rev_a, rev_b]
+    if path is not None:
+      cmd.extend(['--', type(self).cleanPath(path)])
+    return self._command(cmd)
 
   def ancestor(self, rev1, rev2):
     cmd = [GIT, 'merge-base', rev1, rev2]

@@ -4,6 +4,8 @@ import re
 import subprocess
 from common import *
 
+DIFF = 'diff'
+SVN = 'svn'
 SVNADMIN = 'svnadmin'
 SVNLOOK = 'svnlook'
 
@@ -313,8 +315,32 @@ class SvnRepo(VCSRepo):
             parents.append('%s:%d' % (head, h[0].rev))
     return CommitLogEntry(rev, parents, date, author, message)
 
-  def diff(self, rev_a, rev_b, path_a, path_b=None):
-    raise NotImplementedError
+  def diff(self, rev_a, rev_b, path=None):
+    import os, shutil, tempfile
+    rev_a, prefix_a = self._maprev(rev_a)
+    rev_b, prefix_b = self._maprev(rev_b)
+    tmpdir = tempfile.mkdtemp(prefix='anyvcs-svn-diff.')
+    try:
+      path_a = os.path.join(tmpdir, 'a')
+      path_b = os.path.join(tmpdir, 'b')
+      url_a = 'file://%s/%s@%d' % (self.path, prefix_a, rev_a)
+      url_b = 'file://%s/%s@%d' % (self.path, prefix_b, rev_b)
+      cmd = [SVN, 'export', '-q', url_a, path_a]
+      subprocess.check_call(cmd)
+      cmd = [SVN, 'export', '-q', url_b, path_b]
+      subprocess.check_call(cmd)
+      if path is None:
+        cmd = [DIFF, '-urN', 'a', 'b']
+      else:
+        path = type(self).cleanPath(path)
+        cmd = [DIFF, '-urN', 'a' + path, 'b' + path]
+      p = subprocess.Popen(cmd, cwd=tmpdir, stdout=subprocess.PIPE)
+      stdout, stderr = p.communicate()
+      if p.returncode not in (0, 1):
+        raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
+      return stdout
+    finally:
+      shutil.rmtree(tmpdir)
 
   def _changed(self, rev):
     cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
