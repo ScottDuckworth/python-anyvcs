@@ -1551,7 +1551,7 @@ class SvnBranchTestStep11(SvnTest, BranchTestStep11):
   def test_log_None_branch1_path_b(self):
     branch1 = self.encode_branch('branch1')
     result = [x.rev for x in self.repo.log(revrange=(None, branch1), path='/b')]
-    correct = [10, 4]
+    correct = [11, 10, 4]
     self.assertEqual(result, correct)
 
   def test_log_main_branch1(self):
@@ -1651,7 +1651,7 @@ class SvnBranchTestStep13(SvnTest, BranchTestStep13):
 
   def test_log_None_main_path_b(self):
     result = [x.rev for x in self.repo.log(revrange=(None, self.main_branch), path='/b')]
-    correct = [10, 4]
+    correct = [15, 11, 10, 4]
     self.assertEqual(result, correct)
 
 
