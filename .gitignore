@@ -1,1 +1,2 @@
 *.py[coa]
+/python_anyvcs.egg-info
