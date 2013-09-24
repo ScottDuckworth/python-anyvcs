@@ -268,15 +268,23 @@ class SvnRepo(VCSRepo):
             if minrev <= r.rev <= maxrev:
               fullpath = prefix + path
               if fullpath in changed:
-                merges = self._mergeinfo(r.rev, prefix)
-                merge.update(merges)
+                mergeinfo = self._mergeinfo(r.rev, prefix)
+                merge.update(mergeinfo)
                 _results.append(r)
                 continue
           path_filter.update(merge)
         results = _results
       if limit is not None:
         results = results[:limit]
-      return map(lambda x: self._logentry(x.rev, x.path), results)
+      results = map(lambda x: self._logentry(x.rev, x.path), results)
+      if merges is not None:
+        if merges:
+          results = filter(lambda x: len(x.parents) > 1, results)
+        else:
+          for x in results:
+            print x.rev, x.parents
+          results = filter(lambda x: len(x.parents) <= 1, results)
+      return results
     else:
       rev, prefix = self._maprev(revrange)
       h = self._history(rev, prefix, 1)
