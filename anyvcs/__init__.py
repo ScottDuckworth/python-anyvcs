@@ -15,10 +15,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-from common import UnknownVCSType, PathDoesNotExist, BadFileType
 
 def create(path, vcs):
+  from common import UnknownVCSType
   if vcs == 'git':
     from git import GitRepo
     cls = GitRepo
@@ -33,6 +32,8 @@ def create(path, vcs):
   return cls.create(path)
 
 def open(path, vcs=None):
+  import os
+  from common import UnknownVCSType
   assert os.path.isdir(path), path + ' is not a directory'
   if vcs == 'git':
     from git import GitRepo
