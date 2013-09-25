@@ -26,8 +26,7 @@ import time
 import unittest
 import xml.etree.ElementTree as ET
 from abc import ABCMeta, abstractmethod
-from anyvcs import UnknownVCSType, PathDoesNotExist, BadFileType
-from anyvcs.common import CommitLogEntry, UTCOffset
+from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
 
 debug_to_stdout = False
 keep_test_dir = False
