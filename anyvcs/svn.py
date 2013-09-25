@@ -232,7 +232,7 @@ class SvnRepo(VCSRepo):
     return results
 
   def branches(self):
-    return self._heads(self.branch_glob)
+    return ['HEAD'] + self._heads(self.branch_glob)
 
   def tags(self):
     return self._heads(self.tag_glob)

@@ -479,7 +479,7 @@ class HgEmptyTest(HgTest, EmptyTest):
 class SvnEmptyTest(SvnTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
-    correct = []
+    correct = ['HEAD']
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
 
   def test_tags(self):
@@ -774,7 +774,7 @@ class HgBasicTest(HgTest, BasicTest):
 class SvnBasicTest(SvnTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()
-    correct = []
+    correct = ['HEAD']
     self.assertEqual(normalize_heads(result), normalize_heads(correct))
 
   def test_tags(self):
@@ -833,7 +833,11 @@ class UnrelatedBranchTest(object):
 
 class GitUnrelatedBranchTest(GitTest, UnrelatedBranchTest): pass
 class HgUnrelatedBranchTest(HgTest, UnrelatedBranchTest): pass
-class SvnUnrelatedBranchTest(SvnTest, UnrelatedBranchTest): pass
+class SvnUnrelatedBranchTest(SvnTest, UnrelatedBranchTest):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = ['HEAD'] + map(self.encode_branch, [self.main_branch, 'branch1'])
+    self.assertEqual(sorted(result), sorted(correct))
 
 
 ### TEST CASES: BranchTest* ###
@@ -953,11 +957,6 @@ class BranchTestStep3(object):
     for k in sorted(cls.rev.iterkeys()):
       cls.revrev.setdefault(cls.rev[k], k)
 
-  def test_branches(self):
-    result = self.repo.branches()
-    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
-    self.assertEqual(sorted(result), sorted(correct))
-
   def test_ancestor_main_branch1(self):
     branch1 = self.encode_branch('branch1')
     result = self.repo.ancestor(self.main_branch, branch1)
@@ -985,6 +984,11 @@ class BranchTestStep3(object):
     self.assertEqual(result, 'step 3')
 
 class GitLikeBranchTestStep3(BranchTestStep3):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
     correct = 2
@@ -1021,6 +1025,11 @@ class GitLikeBranchTestStep3(BranchTestStep3):
 class GitBranchTestStep3(GitTest, GitLikeBranchTestStep3): pass
 class HgBranchTestStep3(HgTest, GitLikeBranchTestStep3): pass
 class SvnBranchTestStep3(SvnTest, BranchTestStep3):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = ['HEAD'] + map(self.encode_branch, [self.main_branch, 'branch1'])
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.repo.log(revrange=self.main_branch).rev
     correct = 2
@@ -1064,12 +1073,6 @@ class BranchTestStep7(object):
     cls.revrev = {}
     for k in sorted(cls.rev.iterkeys()):
       cls.revrev.setdefault(cls.rev[k], k)
-
-  def test_branches(self):
-    result = self.repo.branches()
-    correct = map(self.encode_branch,
-                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
-    self.assertEqual(sorted(result), sorted(correct))
 
   def test_ancestor_main_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1174,6 +1177,12 @@ class BranchTestStep7(object):
     self.assertEqual(rc, 0)
 
 class GitLikeBranchTestStep7(BranchTestStep7):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = map(self.encode_branch,
+                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
     correct = 5
@@ -1246,6 +1255,12 @@ class GitLikeBranchTestStep7(BranchTestStep7):
 class GitBranchTestStep7(GitTest, GitLikeBranchTestStep7): pass
 class HgBranchTestStep7(HgTest, GitLikeBranchTestStep7): pass
 class SvnBranchTestStep7(SvnTest, BranchTestStep7):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = ['HEAD'] + map(self.encode_branch,
+                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.repo.log(revrange=self.main_branch).rev
     correct = 5
@@ -1587,11 +1602,6 @@ class BranchTestStep13(object):
     for k in sorted(cls.rev.iterkeys()):
       cls.revrev.setdefault(cls.rev[k], k)
 
-  def test_branches(self):
-    result = self.repo.branches()
-    correct = [self.encode_branch(self.main_branch)]
-    self.assertEqual(sorted(result), sorted(correct))
-
   def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
     correct = [
@@ -1608,6 +1618,11 @@ class BranchTestStep13(object):
     self.assertEqual(result, 'step 5')
 
 class GitBranchTestStep13(GitTest, BranchTestStep13):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = [self.encode_branch(self.main_branch)]
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
     correct = 15
@@ -1629,6 +1644,11 @@ class GitBranchTestStep13(GitTest, BranchTestStep13):
     self.assertEqual(result, correct)
 
 class HgBranchTestStep13(HgTest, BranchTestStep13):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = [self.encode_branch(self.main_branch)]
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
     correct = 15
@@ -1650,6 +1670,11 @@ class HgBranchTestStep13(HgTest, BranchTestStep13):
     self.assertEqual(result, correct)
 
 class SvnBranchTestStep13(SvnTest, BranchTestStep13):
+  def test_branches(self):
+    result = self.repo.branches()
+    correct = ['HEAD', self.encode_branch(self.main_branch)]
+    self.assertEqual(sorted(result), sorted(correct))
+
   def test_log_main(self):
     result = self.repo.log(revrange=self.main_branch).rev
     correct = 15
