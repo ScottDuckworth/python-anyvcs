@@ -9,7 +9,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 execfile('anyvcs/__init__.py')
 
 setup(
-  name='python-anyvcs',
+  name='anyvcs',
   version=__version__,
   packages=['anyvcs'],
   include_package_data=True,
