@@ -247,12 +247,12 @@ class SvnRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    if revrange is None or revrange == (None, None):
+    if revrange is None or revrange in ((None, None), [None, None]):
       results = []
       for rev, prefix in self._history(self.youngest(), '/', limit):
         results.append(self._logentry(rev, prefix))
       return results
-    elif isinstance(revrange, tuple):
+    elif isinstance(revrange, (tuple, list)):
       path_filter = None
       if revrange[1] is None:
         include = set()

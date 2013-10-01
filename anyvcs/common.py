@@ -207,7 +207,8 @@ class VCSRepo(object):
     """Get commit logs
 
     Arguments:
-    revrange     Either a single revision or a range of revisions as a 2-tuple.
+    revrange     Either a single revision or a range of revisions as a 2
+                 element list or tuple.
     limit        Limit the number of log entries.
     firstparent  Only follow the first parent of merges.
     merges       True means only merges, False means no merges, None means
@@ -220,10 +221,11 @@ class VCSRepo(object):
 
     If revrange is a single revision, return a single log entry.
 
-    If revrange is a 2-tuple (A,B), return a list of log entries starting at
-    B and following that branch back to A or one of its ancestors (not
-    inclusive. If A is None, follow branch B back to the beginning of history.
-    If B is None, list all descendants in reverse chronological order.
+    If revrange is a 2 element list [A,B] or tuple (A,B), return a list of log
+    entries starting at B and following that branch back to A or one of its
+    ancestors (not inclusive. If A is None, follow branch B back to the
+    beginning of history. If B is None, list all descendants in reverse
+    chronological order.
 
     """
     raise NotImplementedError
