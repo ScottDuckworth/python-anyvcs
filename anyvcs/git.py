@@ -104,7 +104,7 @@ class GitRepo(VCSRepo):
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
-    if ls[0].type != 'f':
+    if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
     cmd = [GIT, 'cat-file', 'blob', '%s:%s' % (rev, path)]
     return self._command(cmd)
@@ -117,7 +117,7 @@ class GitRepo(VCSRepo):
     path = type(self).cleanPath(path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
-    if ls[0].type != 'l':
+    if ls[0].get('type') != 'l':
       raise BadFileType(rev, path)
     return self._readlink(rev, path)
 

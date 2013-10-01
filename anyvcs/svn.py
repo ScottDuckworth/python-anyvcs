@@ -184,7 +184,7 @@ class SvnRepo(VCSRepo):
     path = type(self).cleanPath(prefix + path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
-    if ls[0].type != 'f':
+    if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
     return self._cat(str(rev), path)
 
@@ -199,7 +199,7 @@ class SvnRepo(VCSRepo):
     path = type(self).cleanPath(prefix + path)
     ls = self.ls(rev, path, directory=True)
     assert len(ls) == 1
-    if ls[0].type != 'l':
+    if ls[0].get('type') != 'l':
       raise BadFileType(rev, path)
     return self._readlink(str(rev), path)
 
@@ -217,7 +217,7 @@ class SvnRepo(VCSRepo):
     results = []
     def match(n, path):
       for d in self.ls(youngest, path):
-        if d.type == 'd':
+        if d.get('type') == 'd':
           for k, v in n.iteritems():
             if fnmatch.fnmatchcase(d.name, k):
               if path:

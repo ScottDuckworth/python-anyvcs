@@ -678,6 +678,9 @@ class BasicTest(object):
   def test_cat_error4(self):
     self.assertRaises(BadFileType, self.repo.cat, self.main_branch, '/c')
 
+  def test_cat_error5(self):
+    self.assertRaises(BadFileType, self.repo.cat, self.main_branch, '/')
+
   def test_readlink1(self):
     result = self.repo.readlink(self.main_branch, 'b')
     correct = 'a'
@@ -709,6 +712,9 @@ class BasicTest(object):
 
   def test_readlink_error4(self):
     self.assertRaises(BadFileType, self.repo.readlink, self.main_branch, '/c')
+
+  def test_readlink_error5(self):
+    self.assertRaises(BadFileType, self.repo.readlink, self.main_branch, '/')
 
   def test_log_head(self):
     result = self.repo.log(revrange=self.main_branch)
