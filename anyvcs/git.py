@@ -164,7 +164,7 @@ class GitRepo(VCSRepo):
     single = False
     if revrange is None:
       cmd.append('--all')
-    elif isinstance(revrange, tuple):
+    elif isinstance(revrange, (tuple, list)):
       if revrange[0] is None:
         if revrange[1] is None:
           cmd.append('--all')
