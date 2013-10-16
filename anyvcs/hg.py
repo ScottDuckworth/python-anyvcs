@@ -1,4 +1,4 @@
-# Copyright 2013 Scott Duckworth
+# Copyright 2013 Clemson University
 #
 # This file is part of python-anyvcs.
 #
