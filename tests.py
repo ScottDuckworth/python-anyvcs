@@ -36,7 +36,6 @@ if debug_to_stdout:
   logfile = sys.stdout
 else:
   logfile = open(os.devnull, 'w')
-date_rx = re.compile(r'^(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})(?:\s+|T)(?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2})(?:\.(?P<us>\d{6}))?(?:Z|\s+(?P<tz>[+-]?\d{4}))$')
 
 UTC = UTCOffset(0, 'UTC')
 
@@ -62,23 +61,6 @@ def normalize_datetime(x):
 
 def normalize_logmsg(x):
   return x.rstrip()
-
-def parse_date(x):
-  m = date_rx.match(x)
-  if m is None:
-    return None
-  d = datetime.datetime(*[int(x) for x in m.group('year', 'month', 'day', 'hour', 'minute', 'second')])
-  if m.group('us'):
-    d = d.replace(microsecond=int(m.group('us')))
-  tz = m.group('tz')
-  if tz:
-    offset = datetime.timedelta(minutes=int(tz[-2:]), hours=int(tz[-4:-2]))
-    if tz[0] == '-':
-      offset = -offset
-  else:
-    offset = 0
-  d = d.replace(tzinfo=UTCOffset(offset))
-  return d
 
 
 ### VCS FRAMEWORK CLASSES ###
