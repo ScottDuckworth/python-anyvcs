@@ -480,3 +480,30 @@ class SvnRepo(VCSRepo):
           i2 += 1
 
     return None
+
+  def _blame(self, rev, path):
+    import os
+    import xml.etree.ElementTree as ET
+    url = 'file://' + os.path.abspath(self.path) + path
+    cmd = [SVN, 'blame', '--xml', '-r', rev, url]
+    output = self._command(cmd)
+    tree = ET.fromstring(output)
+    results = []
+    cat = self._cat(rev, path)
+    for entry, text in zip(tree.find('target').iter('entry'), cat.splitlines()):
+      commit = entry.find('commit')
+      rev = int(commit.attrib.get('revision'))
+      author = commit.find('author').text
+      date = commit.find('date').text
+      date = parse_isodate(date)
+      results.append(blame_tuple(rev, author, date, text))
+    return results
+
+  def blame(self, rev, path):
+    rev, prefix = self._maprev(rev)
+    path = type(self).cleanPath(prefix + path)
+    ls = self.ls(rev, path, directory=True)
+    assert len(ls) == 1
+    if ls[0].get('type') != 'f':
+      raise BadFileType(rev, path)
+    return self._blame(str(rev), path)

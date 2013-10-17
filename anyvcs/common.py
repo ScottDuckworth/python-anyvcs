@@ -19,9 +19,12 @@ import datetime
 import re
 import subprocess
 from abc import ABCMeta, abstractmethod
+from collections import namedtuple
 
 multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
+
+blame_tuple = namedtuple('blame_tuple', 'rev author date line')
 
 def parse_isodate(datestr):
   """Parse a string that loosely fits ISO 8601 formatted date-time string
@@ -287,5 +290,17 @@ class VCSRepo(object):
   @abstractmethod
   def ancestor(self, rev1, rev2):
     """Find most recent common ancestor of two revisions
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def blame(self, rev, path):
+    """Blame (a.k.a. annotate, praise) a file
+
+    Returns a list of named tuples (rev, author, date, line) in file order.
+
+    Raises PathDoesNotExist if the path does not exist.
+    Raises BadFileType if the path is not a file.
+
     """
     raise NotImplementedError

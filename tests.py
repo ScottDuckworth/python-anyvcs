@@ -755,6 +755,15 @@ class BasicTest(object):
     rc = subprocess.call(['diff', '-urN', empty_path, rev1_path])
     self.assertEqual(rc, 0)
 
+  def test_blame(self):
+    result = self.repo.blame(self.main_branch, 'a')
+    self.assertIsInstance(result, list)
+    self.assertEqual(len(result), 1)
+    self.assertEqual(result[0].rev, self.rev1)
+    self.assertIsInstance(result[0].author, str)
+    self.assertIsInstance(result[0].date, datetime.datetime)
+    self.assertEqual(result[0].line, 'Pisgah')
+
 class GitBasicTest(GitTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()

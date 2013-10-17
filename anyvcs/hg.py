@@ -25,12 +25,18 @@ HG = 'hg'
 manifest_rx = re.compile(r'^(?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
 parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
+annotate_rx = re.compile(r'^(?P<author>.*)\s+(?P<rev>\d+):\s')
 
 def parent_dirs(path):
   ds = path.find('/')
   while ds != -1:
     yield path[:ds]
     ds = path.find('/', ds + 1)
+
+def parse_hgdate(datestr):
+  ts, tzoffset = datestr.split(None, 1)
+  date = datetime.datetime.fromtimestamp(float(ts))
+  return date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
 
 class HgRepo(VCSRepo):
   @classmethod
@@ -212,9 +218,7 @@ class HgRepo(VCSRepo):
       rev, parents, date, author, message = log.split('\n', 4)
       parents = [x[1] for x in filter(lambda x: x[0] != '-1',
         (x.split(':') for x in parents.split()))]
-      ts, tzoffset = date.split()
-      date = datetime.datetime.fromtimestamp(float(ts))
-      date = date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
+      date = parse_hgdate(date)
       message = message.replace('\n\t', '\n')
       entry = CommitLogEntry(rev, parents, date, author, message)
       if single:
@@ -239,3 +243,31 @@ class HgRepo(VCSRepo):
       return None
     else:
       return output
+
+  def _blame(self, rev, path):
+    cmd = [HG, 'annotate', '-unv', '-r', rev, '--', path]
+    output = self._command(cmd)
+    revs = {}
+    results = []
+    cat = self._cat(rev, path)
+    for line, text in zip(output.splitlines(), cat.splitlines()):
+      m = annotate_rx.match(line)
+      assert m, 'unexpected output: ' + line
+      rev, author = m.group('rev', 'author')
+      try:
+        rev, date = revs[rev]
+      except KeyError:
+        cmd = [HG, 'log', '--template={node}\n{date|hgdate}', '-r', rev]
+        rev, date = self._command(cmd).split('\n', 1)
+        date = parse_hgdate(date)
+        revs[rev] = rev, date
+      results.append(blame_tuple(rev, author, date, text))
+    return results
+
+  def blame(self, rev, path):
+    path = type(self).cleanPath(path)
+    ls = self.ls(rev, path, directory=True)
+    assert len(ls) == 1
+    if ls[0].get('type') != 'f':
+      raise BadFileType(rev, path)
+    return self._blame(str(rev), path)

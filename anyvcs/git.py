@@ -25,6 +25,7 @@ GIT = 'git'
 ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?:[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
+blame_rx = re.compile(r'^(?P<rev>[0-9a-fA-F]{40})\t\((?P<author>[^\t]*)\t(?P<date>[^\t]+)\t\d+\)(?P<text>.*)$')
 
 class GitRepo(VCSRepo):
   @classmethod
@@ -233,3 +234,23 @@ class GitRepo(VCSRepo):
       return None
     else:
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
+
+  def _blame(self, rev, path):
+    cmd = [GIT, 'blame', '--root', '-lc', rev, '--', path]
+    output = self._command(cmd)
+    results = []
+    for line in output.splitlines():
+      m = blame_rx.match(line)
+      assert m, 'unexpected output: ' + line
+      rev, author, date, text = m.group('rev', 'author', 'date', 'text')
+      date = parse_isodate(date)
+      results.append(blame_tuple(rev, author, date, text))
+    return results
+
+  def blame(self, rev, path):
+    path = type(self).cleanPath(path)
+    ls = self.ls(rev, path, directory=True)
+    assert len(ls) == 1
+    if ls[0].get('type') != 'f':
+      raise BadFileType(rev, path)
+    return self._blame(rev, path)
