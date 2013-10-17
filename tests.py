@@ -431,6 +431,11 @@ class EmptyTest(object):
     correct = True
     self.assertEqual(result, correct)
 
+  def test_len(self):
+    result = len(self.repo)
+    correct = 0
+    self.assertEqual(result, correct)
+
 class GitEmptyTest(GitTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
@@ -725,6 +730,17 @@ class BasicTest(object):
     result = self.repo.log(revrange=self.rev1)
     self.assertIsInstance(result, CommitLogEntry)
     self.assertEqual(result.rev, self.rev1)
+
+  def test_in(self):
+    self.assertIn(self.rev1, self.repo)
+
+  def test_not_in(self):
+    self.assertNotIn('foo', self.repo)
+
+  def test_len(self):
+    result = len(self.repo)
+    correct = 1
+    self.assertEqual(result, correct)
 
 class GitBasicTest(GitTest, BasicTest):
   def test_branches(self):

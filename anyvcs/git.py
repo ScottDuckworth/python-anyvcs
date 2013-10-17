@@ -146,6 +146,20 @@ class GitRepo(VCSRepo):
     stdout, stderr = p.communicate()
     return not rev_rx.match(stdout)
 
+  def __contains__(self, rev):
+    cmd = [GIT, 'rev-list', '-n', '1', rev]
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return p.returncode == 0
+
+  def __len__(self):
+    cmd = [GIT, 'rev-list', '--all']
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return len(stdout.splitlines())
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     if self.empty():

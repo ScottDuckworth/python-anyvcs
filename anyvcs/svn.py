@@ -245,6 +245,19 @@ class SvnRepo(VCSRepo):
     output = self._command(cmd)
     return len(output.splitlines()) < 4
 
+  def __contains__(self, rev):
+    rev, prefix = self._maprev(rev)
+    cmd = [SVNLOOK, 'history', '.', prefix, '-l1', '-r', str(rev)]
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return p.returncode == 0
+
+  def __len__(self):
+    cmd = [SVNLOOK, 'history', '.']
+    output = self._command(cmd)
+    return len(output.splitlines()) - 3
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     if revrange is None or revrange in ((None, None), [None, None]):

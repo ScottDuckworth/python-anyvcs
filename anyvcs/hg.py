@@ -160,6 +160,18 @@ class HgRepo(VCSRepo):
     output = self._command(cmd)
     return output == ''
 
+  def __contains__(self, rev):
+    cmd = [HG, 'log', '--template=a', '-r', str(rev)]
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return p.returncode == 0
+
+  def __len__(self):
+    cmd = [HG, 'id', '-n', '-r', 'tip']
+    output = self._command(cmd)
+    return int(output) + 1
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n{desc|tabindent}\n\n']

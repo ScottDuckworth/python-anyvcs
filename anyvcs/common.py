@@ -202,6 +202,18 @@ class VCSRepo(object):
     return NotImplementedError
 
   @abstractmethod
+  def __contains__(self, rev):
+    """Test if the repository contains the specified revision
+    """
+    return NotImplementedError
+
+  @abstractmethod
+  def __len__(self):
+    """Returns the number of commits in the repository
+    """
+    return NotImplementedError
+
+  @abstractmethod
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     """Get commit logs
