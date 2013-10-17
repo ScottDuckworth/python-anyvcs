@@ -112,8 +112,7 @@ class HgRepo(VCSRepo):
     assert len(ls) == 1
     if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
-    cmd = [HG, 'cat', '-r', str(rev), path]
-    return self._command(cmd)
+    return self._cat(str(rev), path)
 
   def readlink(self, rev, path):
     path = type(self).cleanPath(path)
