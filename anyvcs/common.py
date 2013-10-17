@@ -21,17 +21,38 @@ import subprocess
 from abc import ABCMeta, abstractmethod
 
 multislash_rx = re.compile(r'//+')
-isodate_rx = re.compile(r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\s+(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{1,2})\s+(?P<tz>[+-]?\d{4})')
+isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
 
 def parse_isodate(datestr):
+  """Parse a string that loosely fits ISO 8601 formatted date-time string
+  """
   m = isodate_rx.search(datestr)
   assert m, 'unrecognized date format: ' + datestr
-  date = datetime.datetime(*[int(x) for x in m.group('year', 'month', 'day', 'hour', 'minute', 'second')])
-  tz = m.group('tz')
-  offset = datetime.timedelta(minutes=int(tz[-2:]), hours=int(tz[-4:-2]))
-  if tz[0] == '-':
-    offset = -offset
-  return date.replace(tzinfo=UTCOffset(offset))
+  year, month, day = m.group('year', 'month', 'day')
+  hour, minute, second, fraction = m.group('hour', 'minute', 'second', 'fraction')
+  tz, tzhh, tzmm = m.group('tz', 'tzhh', 'tzmm')
+  dt = datetime.datetime(int(hour), int(month), int(day), int(hour))
+  if fraction is None:
+    fraction = 0
+  else:
+    fraction = float('0.' + fraction)
+  if minute is None:
+    dt = dt.replace(minute=int(60 * fraction))
+  else:
+    dt = dt.replace(minute=int(minute))
+    if second is None:
+      dt = dt.replace(second=int(60 * fraction))
+    else:
+      dt = dt.replace(second=int(second), microsecond=int(1000000 * fraction))
+  if tz is not None:
+    if tz[0] == 'Z':
+      offset = 0
+    else:
+      offset = datetime.timedelta(minutes=int(tzmm or 0), hours=int(tzhh))
+      if tz[0] == '-':
+        offset = -offset
+    dt = dt.replace(tzinfo=UTCOffset(offset))
+  return dt
 
 class UnknownVCSType(Exception):
   pass
