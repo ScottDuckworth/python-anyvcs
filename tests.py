@@ -742,6 +742,37 @@ class BasicTest(object):
     correct = 1
     self.assertEqual(result, correct)
 
+  def test_pdiff(self):
+    import errno
+    empty_path = os.path.join(self.dir, 'empty')
+    rev1_path = os.path.join(self.dir, 'rev1')
+    try:
+      shutil.rmtree(empty_path)
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+    try:
+      shutil.rmtree(rev1_path)
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+    os.mkdir(empty_path)
+    self.export(self.rev1, rev1_path)
+    pdiff = self.repo.pdiff(self.rev1)
+    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=empty_path, stdin=subprocess.PIPE)
+    p.communicate(pdiff)
+    self.assertEqual(p.returncode, 0)
+    # symlinks are not reconstructed by patch, so just make sure the file exists
+    # then remove it so that diff works
+    self.assertTrue(os.path.isfile(os.path.join(empty_path, 'b')))
+    os.unlink(os.path.join(empty_path, 'b'))
+    os.unlink(os.path.join(rev1_path, 'b'))
+    self.assertTrue(os.path.isfile(os.path.join(empty_path, 'c', 'd', 'f')))
+    os.unlink(os.path.join(empty_path, 'c', 'd', 'f'))
+    os.unlink(os.path.join(rev1_path, 'c', 'd', 'f'))
+    rc = subprocess.call(['diff', '-urN', empty_path, rev1_path])
+    self.assertEqual(rc, 0)
+
 class GitBasicTest(GitTest, BasicTest):
   def test_branches(self):
     result = self.repo.branches()

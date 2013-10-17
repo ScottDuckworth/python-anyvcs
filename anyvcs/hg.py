@@ -223,6 +223,10 @@ class HgRepo(VCSRepo):
       results.append(entry)
     return results
 
+  def pdiff(self, rev):
+    cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
+    return self._command(cmd)[1:]
+
   def diff(self, rev_a, rev_b, path=None):
     cmd = [HG, 'diff', '-r', rev_a, '-r', rev_b]
     if path is not None:
