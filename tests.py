@@ -569,6 +569,16 @@ class BasicTest(object):
     result = self.repo.ls(self.main_branch, '/a', directory=True)
     correct = [{'type':'f'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
+  
+  def test_ls11(self):
+    result = self.repo.ls(self.main_branch, '/c/d', directory=True)
+    correct = [{'type':'d'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls12(self):
+    result = self.repo.ls(self.main_branch, '/c/d/', directory=True)
+    correct = [{'type':'d'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls_error1(self):
     self.assertRaises(PathDoesNotExist, self.repo.ls, self.main_branch, '/z')
