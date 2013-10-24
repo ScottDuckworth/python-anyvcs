@@ -179,7 +179,8 @@ class HgRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    cmd = [HG, 'log', '--debug', '--template={node}\n{parents}\n{date|hgdate}\n{author}\n{desc|tabindent}\n\n']
+    cmd = [HG, 'log', '--debug', '--template={node}\\0{parents}\\0'
+           '{date|hgdate}\\0{author|nonempty}\\0{desc|tabindent|nonempty}\\0\\0']
     if limit is not None:
       cmd.append('-l' + str(limit))
     if firstparent:
@@ -213,9 +214,10 @@ class HgRepo(VCSRepo):
     output = self._command(cmd)
 
     results = []
-    logs = output.split('\n\n')[:-1]
+    logs = output.split('\0\0')
+    logs.pop()
     for log in logs:
-      rev, parents, date, author, message = log.split('\n', 4)
+      rev, parents, date, author, message = log.split('\0', 4)
       parents = [x[1] for x in filter(lambda x: x[0] != '-1',
         (x.split(':') for x in parents.split()))]
       date = parse_hgdate(date)
