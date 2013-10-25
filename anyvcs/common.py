@@ -34,7 +34,7 @@ def parse_isodate(datestr):
   year, month, day = m.group('year', 'month', 'day')
   hour, minute, second, fraction = m.group('hour', 'minute', 'second', 'fraction')
   tz, tzhh, tzmm = m.group('tz', 'tzhh', 'tzmm')
-  dt = datetime.datetime(int(hour), int(month), int(day), int(hour))
+  dt = datetime.datetime(int(year), int(month), int(day), int(hour))
   if fraction is None:
     fraction = 0
   else:
