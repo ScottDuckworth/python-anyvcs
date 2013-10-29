@@ -500,7 +500,7 @@ class BasicTest(object):
       f.write('Denali')
     os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
     os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
-    yield Commit('commit 1')
+    yield Commit('commit 1\n\nsetup working copy')
     cls.rev1 = cls.getAbsoluteRev()
 
   def test_empty(self):
