@@ -247,7 +247,9 @@ class CreateStandardDirectoryStructure(Action):
     test.check_call(['svn', 'mkdir', 'trunk', 'branches', 'tags'])
     commit = Commit('create standard directory structure')
     commit.doSvn(test)
-    test.check_call(['svn', 'switch', 'file://'+test.main_path+'/trunk'])
+    shutil.rmtree(test.working_path)
+    url = 'file://'+test.main_path+'/trunk'
+    check_call(['svn', 'co', url, test.working_path])
     test.main_branch = 'trunk'
     test.working_head = 'trunk'
 
@@ -272,7 +274,7 @@ class Commit(Action):
     xml = test.check_output(['svn', 'status', '--xml'])
     tree = ET.fromstring(xml)
     for entry in tree.iter('entry'):
-      test.check_call(['svn', 'add', '-q', entry.attrib.get('path')])
+      test.check_call(['svn', 'add', '--force', '-q', entry.attrib.get('path')])
     test.check_call(['svn', 'commit', '-m', self.message])
     test.check_call(['svn', 'update'])
 
@@ -316,7 +318,8 @@ class CreateUnrelatedBranch(BranchAction):
   def doSvn(self, test):
     url = 'file://' + test.main_path + '/' + test.encode_branch(self.name)
     test.check_call(['svn', 'mkdir', url, '-m', 'create branch ' + self.name])
-    test.check_call(['svn', 'switch', url])
+    shutil.rmtree(test.working_path)
+    check_call(['svn', 'co', url, test.working_path])
     test.working_head = self.name
 
 class DeleteBranch(BranchAction):
