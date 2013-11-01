@@ -52,6 +52,18 @@ class SvnRepo(VCSRepo):
     self.branch_glob = ['/trunk/', '/branches/*/']
     self.tag_glob = ['/tags/*/']
 
+  @property
+  def private_path(self):
+    import os
+    path = os.path.join(self.path, '.private')
+    try:
+      os.mkdir(path)
+    except OSError as e:
+      import errno
+      if e.errno != errno.EEXIST:
+        raise
+    return path
+
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
     output = self._command(cmd)

@@ -18,7 +18,7 @@
 import datetime
 import re
 import subprocess
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import namedtuple
 
 multislash_rx = re.compile(r'//+')
@@ -125,6 +125,16 @@ class VCSRepo(object):
 
   def __init__(self, path):
     self.path = path
+
+  @abstractproperty
+  def private_path(self):
+    """Get the path to a directory which can be used to store arbitrary data
+
+    This directory should not conflict with any of the repository internals.
+    The directory should be created if it does not already exist.
+
+    """
+    raise NotImplementedError
 
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)

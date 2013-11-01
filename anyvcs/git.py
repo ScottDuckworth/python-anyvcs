@@ -34,6 +34,18 @@ class GitRepo(VCSRepo):
     subprocess.check_call(cmd)
     return cls(path)
 
+  @property
+  def private_path(self):
+    import os
+    path = os.path.join(self.path, '.private')
+    try:
+      os.mkdir(path)
+    except OSError as e:
+      import errno
+      if e.errno != errno.EEXIST:
+        raise
+    return path
+
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
     path = type(self).cleanPath(path)

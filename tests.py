@@ -421,6 +421,11 @@ class EmptyTest(object):
     correct = 0
     self.assertEqual(result, correct)
 
+  def test_private_path(self):
+    private_path = self.repo.private_path
+    self.assertTrue(os.path.isdir(private_path))
+    self.assertEqual(os.listdir(private_path), [])
+
 class GitEmptyTest(GitTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
