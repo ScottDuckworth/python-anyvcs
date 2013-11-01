@@ -22,7 +22,7 @@ from common import *
 
 GIT = 'git'
 
-ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?:[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
+ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?P<object>[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
 blame_rx = re.compile(r'^(?P<rev>[0-9a-fA-F]{40})\t\((?P<author>[^\t]*)\t(?P<date>[^\t]+)\t\d+\)(?P<text>.*)$')
@@ -81,11 +81,19 @@ class GitRepo(VCSRepo):
     cmd.extend([rev, '--', path])
     output = self._command(cmd).rstrip('\0')
 
+    if 'commit' in report:
+      import anydbm
+      import os
+      cache_path = os.path.join(self.private_path, 'object-cache.db')
+      cache = anydbm.open(cache_path, 'c')
+    else:
+      cache = None
+
     results = []
     for line in output.split('\0'):
       m = ls_tree_rx.match(line)
       assert m, 'unexpected output: ' + line
-      mode, name = m.group('mode', 'name')
+      mode, name, objid = m.group('mode', 'name', 'object')
       if recursive_dirs and path == name + '/':
         continue
       assert name.startswith(path), 'unexpected output: ' + line
@@ -110,7 +118,15 @@ class GitRepo(VCSRepo):
           entry.target = self._readlink(rev, name)
       else:
         assert False, 'unexpected output: ' + line
+      if cache is not None:
+        try:
+          entry.commit = cache[objid]
+        except KeyError:
+          cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', name]
+          entry.commit = cache[objid] = self._command(cmd)
       results.append(entry)
+    if cache is not None:
+      cache.close()
     return results
 
   def _cat(self, rev, path):
