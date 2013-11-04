@@ -50,7 +50,7 @@ class GitRepo(VCSRepo):
          directory=False, report=()):
     path = type(self).cleanPath(path)
     forcedir = False
-    if directory and path.endswith('/'):
+    if path.endswith('/'):
       forcedir = True
       path = path.rstrip('/')
     ltrim = len(path)
@@ -60,7 +60,7 @@ class GitRepo(VCSRepo):
       if directory:
         return [{'type':'d'}]
     else:
-      cmd = [GIT, 'ls-tree', '-z', rev, '--', path]
+      cmd = [GIT, 'ls-tree', '-z', rev, '--', path.rstrip('/')]
       output = self._command(cmd).rstrip('\0')
       m = ls_tree_rx.match(output)
       if not m:
