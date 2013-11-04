@@ -559,12 +559,12 @@ class BasicTest(object):
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls7(self):
-    result = self.repo.ls(self.main_branch, '/c', directory=True)
+    result = self.repo.ls(self.main_branch, '/c/d', directory=True)
     correct = [{'type':'d'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls8(self):
-    result = self.repo.ls(self.main_branch, '/c/', directory=True)
+    result = self.repo.ls(self.main_branch, '/c/d/', directory=True)
     correct = [{'type':'d'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
