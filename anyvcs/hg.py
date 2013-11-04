@@ -57,31 +57,32 @@ class HgRepo(VCSRepo):
         raise
     return path
 
-  def ls(self, rev, path, recursive=False, recursive_dirs=False,
-         directory=False, report=()):
-    path = type(self).cleanPath(path)
+  def _ls(self, rev, path, recursive=False, recursive_dirs=False,
+          directory=False):
     forcedir = False
     if path.endswith('/'):
       forcedir = True
       path = path.rstrip('/')
     if path == '':
-      if directory:
-        return [{'type':'d'}]
       ltrim = 0
       prefix = ''
     else:
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [HG, 'manifest', '-v', '-r', str(rev)]
+    cmd = [HG, 'manifest', '-v', '-r', rev]
     output = self._command(cmd)
     dirs = set()
-    results = []
+    exists = False
     for line in output.splitlines():
       m = manifest_rx.match(line)
       assert m, 'unexpected output: ' + line
       t, name = m.group('type', 'name')
       if name.startswith(prefix) or (not forcedir and name == path):
+        if directory and name.startswith(prefix):
+          yield ('d', '')
+          return
+        exists = True
         entry_name = name[ltrim:]
         if '/' in entry_name:
           p = parent_dirs(entry_name)
@@ -89,35 +90,45 @@ class HgRepo(VCSRepo):
             d = p.next()
             if d not in dirs:
               dirs.add(d)
-              entry = attrdict(type='d')
-              if not directory:
-                entry.name = d
-              results.append(entry)
+              yield ('d', d)
             continue
           if recursive_dirs:
             for d in p:
               if d not in dirs:
                 dirs.add(d)
-                entry = attrdict(name=d, type='d')
-                results.append(entry)
-        entry = attrdict()
-        if entry_name:
-          entry.name = entry_name
-        if t in ' *':
-          entry.type = 'f'
-          if 'executable' in report:
-            entry.executable = t == '*'
-          if 'size' in report:
-            entry.size = len(self._cat(str(rev), name))
-        elif t == '@':
-          entry.type = 'l'
-          if 'target' in report:
-            entry.target = self._cat(str(rev), name)
-        else:
-          assert False, 'unexpected output: ' + line
-        results.append(entry)
-    if not results and path != '':
+                yield ('d', d)
+        yield (t, entry_name)
+    if not exists:
       raise PathDoesNotExist(rev, path)
+
+  def ls(self, rev, path, recursive=False, recursive_dirs=False,
+         directory=False, report=()):
+    revstr = str(rev)
+    path = type(self).cleanPath(path)
+    if path == '':
+      if directory:
+        return [{'type':'d'}]
+
+    results = []
+    for t, name in self._ls(revstr, path, recursive, recursive_dirs, directory):
+      entry = attrdict()
+      if name:
+        entry.name = name
+      if t == 'd':
+        entry.type = 'd'
+      elif t in ' *':
+        entry.type = 'f'
+        if 'executable' in report:
+          entry.executable = t == '*'
+        if 'size' in report:
+          entry.size = len(self._cat(revstr, name))
+      elif t == '@':
+        entry.type = 'l'
+        if 'target' in report:
+          entry.target = self._cat(revstr, name)
+      else:
+        assert False, 'unexpected output: ' + line
+      results.append(entry)
     return results
 
   def _cat(self, rev, path):
