@@ -649,6 +649,23 @@ class BasicTest(object):
     ]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
+  def test_ls_report_commit1(self):
+    result = self.repo.ls(self.main_branch, '/', report=('commit',))
+    correct = [
+      {'name':'a', 'type':'f', 'commit':self.rev1},
+      {'name':'b', 'type':'l', 'commit':self.rev1},
+      {'name':'c', 'type':'d', 'commit':self.rev1},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls_report_commit2(self):
+    result = self.repo.ls(self.main_branch, '/c/d', report=('commit',))
+    correct = [
+      {'name':'e', 'type':'f', 'commit':self.rev1},
+      {'name':'f', 'type':'l', 'commit':self.rev1},
+    ]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
   def test_cat1(self):
     result = self.repo.cat(self.main_branch, 'a')
     correct = 'Pisgah'
