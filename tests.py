@@ -559,12 +559,12 @@ class BasicTest(object):
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls7(self):
-    result = self.repo.ls(self.main_branch, '/c', directory=True)
+    result = self.repo.ls(self.main_branch, '/c/d', directory=True)
     correct = [{'type':'d'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls8(self):
-    result = self.repo.ls(self.main_branch, '/c/', directory=True)
+    result = self.repo.ls(self.main_branch, '/c/d/', directory=True)
     correct = [{'type':'d'}]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
@@ -576,6 +576,14 @@ class BasicTest(object):
   def test_ls10(self):
     result = self.repo.ls(self.main_branch, '/a', directory=True)
     correct = [{'type':'f'}]
+    self.assertEqual(normalize_ls(result), normalize_ls(correct))
+
+  def test_ls11(self):
+    result = self.repo.ls(self.main_branch, '/c/d/')
+    correct = [
+      {'name':'e', 'type':'f'},
+      {'name':'f', 'type':'l'},
+    ]
     self.assertEqual(normalize_ls(result), normalize_ls(correct))
 
   def test_ls_error1(self):

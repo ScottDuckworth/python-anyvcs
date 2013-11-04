@@ -50,7 +50,7 @@ class GitRepo(VCSRepo):
          directory=False, report=()):
     path = type(self).cleanPath(path)
     forcedir = False
-    if directory and path.endswith('/'):
+    if path.endswith('/'):
       forcedir = True
       path = path.rstrip('/')
     ltrim = len(path)
@@ -60,7 +60,7 @@ class GitRepo(VCSRepo):
       if directory:
         return [{'type':'d'}]
     else:
-      cmd = [GIT, 'ls-tree', '-z', rev, '--', path]
+      cmd = [GIT, 'ls-tree', '-z', rev, '--', path.rstrip('/')]
       output = self._command(cmd).rstrip('\0')
       m = ls_tree_rx.match(output)
       if not m:
@@ -104,8 +104,6 @@ class GitRepo(VCSRepo):
       mode = int(mode, 8)
       if stat.S_ISDIR(mode):
         entry.type = 'd'
-      elif forcedir:
-        continue
       elif stat.S_ISREG(mode):
         entry.type = 'f'
         if 'executable' in report:
