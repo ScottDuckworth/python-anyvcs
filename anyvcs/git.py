@@ -96,8 +96,6 @@ class GitRepo(VCSRepo):
       mode = int(mode, 8)
       if stat.S_ISDIR(mode):
         entry.type = 'd'
-      elif forcedir:
-        continue
       elif stat.S_ISREG(mode):
         entry.type = 'f'
         if 'executable' in report:
