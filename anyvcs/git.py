@@ -58,7 +58,11 @@ class GitRepo(VCSRepo):
     # make sure the path exists
     if path == '':
       if directory:
-        return [{'type':'d'}]
+        entry = attrdict(type='d')
+        if 'commit' in report:
+          cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev]
+          entry.commit = self._command(cmd)
+        return [entry]
     else:
       cmd = [GIT, 'ls-tree', '-z', rev, '--', path.rstrip('/')]
       output = self._command(cmd).rstrip('\0')
