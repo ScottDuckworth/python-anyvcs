@@ -128,6 +128,10 @@ class HgRepo(VCSRepo):
           entry.target = self._cat(revstr, name)
       else:
         assert False, 'unexpected output: ' + line
+      if 'commit' in report:
+        p = type(self).cleanPath(path + '/' + name)
+        cmd = [HG, 'log', '--template={node}', '-l1', '-r', 'ancestors('+revstr+')', '--', p]
+        entry.commit = self._command(cmd)
       results.append(entry)
     return results
 
