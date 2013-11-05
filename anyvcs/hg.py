@@ -22,7 +22,7 @@ from common import *
 
 HG = 'hg'
 
-manifest_rx = re.compile(r'^(?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
+manifest_rx = re.compile(r'^(?P<object>[0-9a-f]{40}) (?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
 parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 annotate_rx = re.compile(r'^(?P<author>.*)\s+(?P<rev>\d+):\s')
@@ -70,17 +70,17 @@ class HgRepo(VCSRepo):
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [HG, 'manifest', '-v', '-r', rev]
+    cmd = [HG, 'manifest', '--debug', '-r', rev]
     output = self._command(cmd)
     dirs = set()
     exists = False
     for line in output.splitlines():
       m = manifest_rx.match(line)
       assert m, 'unexpected output: ' + line
-      t, name = m.group('type', 'name')
+      t, name, objid = m.group('type', 'name', 'object')
       if name.startswith(prefix) or (not forcedir and name == path):
         if directory and name.startswith(prefix):
-          yield ('d', '')
+          yield ('d', '', None)
           return
         exists = True
         entry_name = name[ltrim:]
@@ -90,14 +90,14 @@ class HgRepo(VCSRepo):
             d = p.next()
             if d not in dirs:
               dirs.add(d)
-              yield ('d', d)
+              yield ('d', d, None)
             continue
           if recursive_dirs:
             for d in p:
               if d not in dirs:
                 dirs.add(d)
-                yield ('d', d)
-        yield (t, entry_name)
+                yield ('d', d, None)
+        yield (t, entry_name, objid)
     if not exists:
       raise PathDoesNotExist(rev, path)
 
@@ -114,12 +114,14 @@ class HgRepo(VCSRepo):
         return [entry]
 
     if 'commit' in report:
-      import os, fcntl, tempfile
-      cache_path = os.path.join(self.private_path, 'commits.cache')
-      with open(cache_path, 'a+') as cache:
-        fcntl.lockf(cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
-        cache.seek(0)
-        log = cache.read().split('\0')
+      import os, fcntl, tempfile, anydbm
+      commit_cache_path = os.path.join(self.private_path, 'commit-cache.log')
+      object_cache_path = os.path.join(self.private_path, 'object-cache.db')
+      object_cache = anydbm.open(object_cache_path, 'c')
+      with open(commit_cache_path, 'a+') as commit_cache:
+        fcntl.lockf(commit_cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
+        commit_cache.seek(0)
+        log = commit_cache.read().split('\0')
         assert log.pop() == ''
         if log:
           startlog = int(log[-1].splitlines()[0]) + 1
@@ -137,14 +139,14 @@ class HgRepo(VCSRepo):
             style.flush()
             cmd = [HG, 'log', '--style', style.name, '-r', '%d:' % startlog]
             output = self._command(cmd)
-            cache.write(output)
+            commit_cache.write(output)
             extend = output.split('\0')
             assert extend.pop() == ''
             log.extend(extend)
 
     results = []
-    results_by_path = {}
-    for t, name in self._ls(revstr, path, recursive, recursive_dirs, directory):
+    lookup_commit = {}
+    for t, name, objid in self._ls(revstr, path, recursive, recursive_dirs, directory):
       entry = attrdict()
       if name:
         entry.name = name
@@ -163,8 +165,16 @@ class HgRepo(VCSRepo):
       else:
         assert False, 'unexpected output: ' + line
       if 'commit' in report:
-        p = type(self).cleanPath(path + '/' + name)
-        results_by_path[p] = entry
+        lookup = True
+        if objid:
+          try:
+            entry.commit = object_cache[objid]
+            lookup = False
+          except KeyError:
+            pass
+        if lookup:
+          p = type(self).cleanPath(path + '/' + name)
+          lookup_commit[p] = (entry, objid)
       results.append(entry)
 
     if 'commit' in report:
@@ -175,7 +185,7 @@ class HgRepo(VCSRepo):
         cmd = [HG, 'log', '--template={rev}', '-r', revstr]
         revnum = int(self._command(cmd))
       ancestors = [-revnum]
-      while ancestors and results_by_path:
+      while ancestors and lookup_commit:
         r = -heapq.heappop(ancestors)
         lines = log[r].splitlines()
         parents = lines[2]
@@ -189,12 +199,16 @@ class HgRepo(VCSRepo):
           x = r - 1
           if x not in ancestors:
             heapq.heappush(ancestors, -x)
-        for p in results_by_path.keys():
+        for p in lookup_commit.keys():
           prefix = p + '/'
           for l in lines[3:]:
             if l == p or l.startswith(prefix):
-              results_by_path[p].commit = lines[1]
-              del results_by_path[p]
+              commit = lines[1]
+              entry, objid = lookup_commit[p]
+              entry.commit = commit
+              if objid:
+                object_cache[objid] = commit
+              del lookup_commit[p]
               break
 
     return results
