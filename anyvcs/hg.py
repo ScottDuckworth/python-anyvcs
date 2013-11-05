@@ -107,7 +107,11 @@ class HgRepo(VCSRepo):
     path = type(self).cleanPath(path)
     if path == '':
       if directory:
-        return [{'type':'d'}]
+        entry = attrdict(type='d')
+        if 'commit' in report:
+          cmd = [HG, 'log', '--template={node}', '-r', revstr]
+          entry.commit = self._command(cmd)
+        return [entry]
 
     if True and 'commit' in report:
       import tempfile
