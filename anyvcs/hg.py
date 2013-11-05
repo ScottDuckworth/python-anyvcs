@@ -113,20 +113,37 @@ class HgRepo(VCSRepo):
           entry.commit = self._command(cmd)
         return [entry]
 
-    if True and 'commit' in report:
-      import tempfile
-      with tempfile.NamedTemporaryFile() as style:
-        style.write(
-          r"changeset = '{rev}\n{node}\n{files}\0'" '\n'
-          r"file = '{file|escape}\n'" '\n'
-        )
-        style.flush()
-        cmd = [HG, 'log', '--style', style.name, '-r', 'reverse(ancestors('+revstr+'))']
-        log = self._command(cmd).split('\0')
-    else:
-      log = None
+    if 'commit' in report:
+      import os, fcntl, tempfile
+      cache_path = os.path.join(self.private_path, 'commits.cache')
+      with open(cache_path, 'a+') as cache:
+        fcntl.lockf(cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
+        cache.seek(0)
+        log = cache.read().split('\0')
+        assert log.pop() == ''
+        if log:
+          startlog = int(log[-1].splitlines()[0]) + 1
+          if startlog >= len(self):
+            startlog = None
+        else:
+          startlog = 0
+        if startlog is not None:
+          with tempfile.NamedTemporaryFile() as style:
+            style.write(
+              r"changeset = '{rev}\n{node}\n{parents}\n{files}\0'" '\n'
+              r"parent = '{rev} '" '\n'
+              r"file = '{file|escape}\n'" '\n'
+            )
+            style.flush()
+            cmd = [HG, 'log', '--style', style.name, '-r', '%d:' % startlog]
+            output = self._command(cmd)
+            cache.write(output)
+            extend = output.split('\0')
+            assert extend.pop() == ''
+            log.extend(extend)
 
     results = []
+    results_by_path = {}
     for t, name in self._ls(revstr, path, recursive, recursive_dirs, directory):
       entry = attrdict()
       if name:
@@ -147,21 +164,39 @@ class HgRepo(VCSRepo):
         assert False, 'unexpected output: ' + line
       if 'commit' in report:
         p = type(self).cleanPath(path + '/' + name)
-        if log is None:
-          cmd = [HG, 'log', '--template={node}', '-l1', '-r', 'reverse(ancestors('+revstr+'))', '--', p]
-          entry.commit = self._command(cmd)
-        else:
-          for logentry in log:
-            lines = logentry.splitlines()
-            found = False
-            for l in lines[2:]:
-              if l == p or l.startswith(p+'/'):
-                found = True
-                break
-            if found:
-              entry.commit = lines[1]
-              break
+        results_by_path[p] = entry
       results.append(entry)
+
+    if 'commit' in report:
+      import heapq
+      if isinstance(rev, int):
+        revnum = rev
+      else:
+        cmd = [HG, 'log', '--template={rev}', '-r', revstr]
+        revnum = int(self._command(cmd))
+      ancestors = [-revnum]
+      while ancestors and results_by_path:
+        r = -heapq.heappop(ancestors)
+        lines = log[r].splitlines()
+        parents = lines[2]
+        if parents:
+          for x in parents.split():
+            x = int(x)
+            if x != -1:
+              if -x not in ancestors:
+                heapq.heappush(ancestors, -x)
+        elif r > 0:
+          x = r - 1
+          if x not in ancestors:
+            heapq.heappush(ancestors, -x)
+        for p in results_by_path.keys():
+          prefix = p + '/'
+          for l in lines[3:]:
+            if l == p or l.startswith(prefix):
+              results_by_path[p].commit = lines[1]
+              del results_by_path[p]
+              break
+
     return results
 
   def _cat(self, rev, path):
