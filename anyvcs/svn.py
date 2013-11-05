@@ -124,6 +124,7 @@ class SvnRepo(VCSRepo):
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
     rev, prefix = self._maprev(rev)
+    revstr = str(rev)
     path = type(self).cleanPath(prefix + path)
     forcedir = False
     if path.endswith('/'):
@@ -132,14 +133,17 @@ class SvnRepo(VCSRepo):
         path = path.rstrip('/')
     if path == '/':
       if directory:
-        return [{'type':'d'}]
+        entry = attrdict(type='d')
+        if 'commit' in report:
+          entry.commit = self._history(revstr, '/', 1)[0].rev
+        return [entry]
       ltrim = 1
       prefix = '/'
     else:
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [SVNLOOK, 'tree', '-r', str(rev), '--full-paths']
+    cmd = [SVNLOOK, 'tree', '-r', revstr, '--full-paths']
     if not recursive:
       cmd.append('--non-recursive')
     cmd.extend(['.', path])
@@ -169,9 +173,9 @@ class SvnRepo(VCSRepo):
         entry.type = 'd'
         entry_name = entry_name.rstrip('/')
       else:
-        proplist = self._proplist(str(rev), name)
+        proplist = self._proplist(revstr, name)
         if 'svn:special' in proplist:
-          link = self._cat(str(rev), name).split(None, 1)
+          link = self._cat(revstr, name).split(None, 1)
           if len(link) == 2 and link[0] == 'link':
             entry.type = 'l'
             if 'target' in report:
@@ -181,9 +185,11 @@ class SvnRepo(VCSRepo):
           if 'executable' in report:
             entry.executable = 'svn:executable' in proplist
           if 'size' in report:
-            entry.size = len(self._cat(str(rev), name))
+            entry.size = len(self._cat(revstr, name))
       if entry_name:
         entry.name = entry_name
+      if 'commit' in report:
+        entry.commit = self._history(revstr, name, 1)[0].rev
       results.append(entry)
     return results
 

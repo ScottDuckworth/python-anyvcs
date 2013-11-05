@@ -161,7 +161,7 @@ class VCSRepo(object):
                     contents.
     report          A list or tuple of extra attributes to return that may
                     require extra processing. Recognized values are 'size',
-                    'target', and 'executable'.
+                    'target', 'executable', and 'commit'.
 
     Returns a list of dictionaries with the following keys:
     type        The type of the file: 'f' for file, 'd' for directory, 'l' for
