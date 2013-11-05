@@ -88,10 +88,8 @@ class GitRepo(VCSRepo):
     if 'commit' in report:
       import anydbm
       import os
-      cache_path = os.path.join(self.private_path, 'object-cache.db')
-      cache = anydbm.open(cache_path, 'c')
-    else:
-      cache = None
+      object_cache_path = os.path.join(self.private_path, 'object-cache.db')
+      object_cache = anydbm.open(object_cache_path, 'c')
 
     results = []
     for line in output.split('\0'):
@@ -120,15 +118,17 @@ class GitRepo(VCSRepo):
           entry.target = self._readlink(rev, name)
       else:
         assert False, 'unexpected output: ' + line
-      if cache is not None:
+      if 'commit' in report:
         try:
-          entry.commit = cache[objid]
+          entry.commit = object_cache[objid]
         except KeyError:
           cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', name]
-          entry.commit = cache[objid] = self._command(cmd)
+          entry.commit = object_cache[objid] = self._command(cmd)
       results.append(entry)
-    if cache is not None:
-      cache.close()
+
+    if 'commit' in report:
+      object_cache.close()
+
     return results
 
   def _cat(self, rev, path):
