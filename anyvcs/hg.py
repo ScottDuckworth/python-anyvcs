@@ -109,6 +109,19 @@ class HgRepo(VCSRepo):
       if directory:
         return [{'type':'d'}]
 
+    if True and 'commit' in report:
+      import tempfile
+      with tempfile.NamedTemporaryFile() as style:
+        style.write(
+          r"changeset = '{rev}\n{node}\n{files}\0'" '\n'
+          r"file = '{file|escape}\n'" '\n'
+        )
+        style.flush()
+        cmd = [HG, 'log', '--style', style.name, '-r', 'reverse(ancestors('+revstr+'))']
+        log = self._command(cmd).split('\0')
+    else:
+      log = None
+
     results = []
     for t, name in self._ls(revstr, path, recursive, recursive_dirs, directory):
       entry = attrdict()
@@ -130,8 +143,20 @@ class HgRepo(VCSRepo):
         assert False, 'unexpected output: ' + line
       if 'commit' in report:
         p = type(self).cleanPath(path + '/' + name)
-        cmd = [HG, 'log', '--template={node}', '-l1', '-r', 'ancestors('+revstr+')', '--', p]
-        entry.commit = self._command(cmd)
+        if log is None:
+          cmd = [HG, 'log', '--template={node}', '-l1', '-r', 'reverse(ancestors('+revstr+'))', '--', p]
+          entry.commit = self._command(cmd)
+        else:
+          for logentry in log:
+            lines = logentry.splitlines()
+            found = False
+            for l in lines[2:]:
+              if l == p or l.startswith(p+'/'):
+                found = True
+                break
+            if found:
+              entry.commit = lines[1]
+              break
       results.append(entry)
     return results
 
