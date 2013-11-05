@@ -200,7 +200,7 @@ class HgRepo(VCSRepo):
           if x not in ancestors:
             heapq.heappush(ancestors, -x)
         for p in lookup_commit.keys():
-          prefix = p + '/'
+          prefix = p.rstrip('/') + '/'
           for l in lines[3:]:
             if l == p or l.startswith(prefix):
               commit = lines[1]
