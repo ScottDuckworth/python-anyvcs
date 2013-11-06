@@ -492,6 +492,21 @@ class SvnEmptyTest(SvnTest, EmptyTest):
     self.assertEqual(len(result), 1)
     self.assertEqual(result[0].rev, 0)
 
+  def test_pdiff_rev0(self):
+    import errno
+    path_a = os.path.join(self.dir, 'empty')
+    path_b = os.path.join(self.dir, 'pdiff_rev0')
+    shutil.rmtree(path_a, ignore_errors=True)
+    shutil.rmtree(path_b, ignore_errors=True)
+    os.mkdir(path_a)
+    self.export(0, path_b)
+    pdiff = self.repo.pdiff(0)
+    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
+    p.communicate(pdiff)
+    self.assertEqual(p.returncode, 0)
+    rc = subprocess.call(['diff', '-urN', path_a, path_b])
+    self.assertEqual(rc, 0)
+
 
 ### TEST CASE: BasicTest ###
 
