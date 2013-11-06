@@ -16,12 +16,14 @@
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import os
 import re
 import subprocess
 from common import *
 
 HG = 'hg'
 
+canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
 manifest_rx = re.compile(r'^(?P<object>[0-9a-f]{40}) (?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
 parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
@@ -47,7 +49,6 @@ class HgRepo(VCSRepo):
 
   @property
   def private_path(self):
-    import os
     path = os.path.join(self.path, '.hg', '.private')
     try:
       os.mkdir(path)
@@ -56,6 +57,22 @@ class HgRepo(VCSRepo):
       if e.errno != errno.EEXIST:
         raise
     return path
+
+  def canonical_rev(self, rev):
+    if isinstance(rev, str) and canonical_rev_rx.match(rev):
+      return rev
+    else:
+      cmd = [HG, 'log', '--template={node}', '-r', str(rev)]
+      return self._command(cmd)
+
+  def _revnum(self, rev):
+    if isinstance(rev, int):
+      return rev
+    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+      return int(rev)
+    else:
+      cmd = [HG, 'log', '--template={rev}', '-r', str(rev)]
+      return int(self._command(cmd))
 
   def _ls(self, rev, path, recursive=False, recursive_dirs=False,
           directory=False):
@@ -109,12 +126,11 @@ class HgRepo(VCSRepo):
       if directory:
         entry = attrdict(type='d')
         if 'commit' in report:
-          cmd = [HG, 'log', '--template={node}', '-r', revstr]
-          entry.commit = self._command(cmd)
+          entry.commit = self.canonical_rev(revstr)
         return [entry]
 
     if 'commit' in report:
-      import os, fcntl, tempfile, anydbm
+      import fcntl, tempfile, anydbm
       files_cache_path = os.path.join(self.private_path, 'files-cache.log')
       object_cache_path = os.path.join(self.private_path, 'object-cache.db')
       object_cache = anydbm.open(object_cache_path, 'c')
@@ -179,12 +195,7 @@ class HgRepo(VCSRepo):
 
     if 'commit' in report:
       import heapq
-      if isinstance(rev, int):
-        revnum = rev
-      else:
-        cmd = [HG, 'log', '--template={rev}', '-r', revstr]
-        revnum = int(self._command(cmd))
-      ancestors = [-revnum]
+      ancestors = [-self._revnum(revstr)]
       while ancestors and lookup_commit:
         r = -heapq.heappop(ancestors)
         lines = log[r].splitlines()
@@ -310,6 +321,9 @@ class HgRepo(VCSRepo):
         else:
           cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1], '--prune', str(revrange[0])])
     else:
+      entry = self.commit_cache.get(self.canonical_rev(revrange))
+      if entry:
+        return entry
       cmd.extend(['-r', str(revrange)])
       single = True
     if path:
@@ -328,6 +342,8 @@ class HgRepo(VCSRepo):
       date = parse_hgdate(date)
       message = message.replace('\n\t', '\n')
       entry = CommitLogEntry(rev, parents, date, author, message)
+      if rev not in self.commit_cache:
+        self.commit_cache[rev] = entry
       if single:
         return entry
       results.append(entry)

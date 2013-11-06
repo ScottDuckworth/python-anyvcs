@@ -15,7 +15,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
+import anydbm
+import collections
 import datetime
+import json
+import os
 import re
 import subprocess
 from abc import ABCMeta, abstractmethod, abstractproperty
@@ -96,6 +100,58 @@ class CommitLogEntry(object):
   def subject(self):
     return self.message.split('\n', 1)[0]
 
+  def to_json(self):
+    return json.dumps({
+      'v': 1,
+      'r': self.rev,
+      'p': self.parents,
+      'd': self.date.isoformat(),
+      'a': self.author,
+      'm': self.message,
+    })
+
+  @classmethod
+  def from_json(cls, s):
+    o = json.loads(s)
+    if o.get('v') != 1:
+      return None
+    return cls(
+      rev = o['r'],
+      parents = o['p'],
+      date = parse_isodate(o['d']),
+      author = o['a'],
+      message = o['m'],
+    )
+
+class CommitLogCache(collections.MutableMapping):
+  def __init__(self, path):
+    self.db = anydbm.open(path, 'c')
+
+  def __len__(self):
+    return len(self.db)
+
+  def __getitem__(self, key):
+    value = CommitLogEntry.from_json(self.db[key])
+    if value:
+      return value
+    raise KeyError(key)
+
+  def __setitem__(self, key, value):
+    self.db[key] = value.to_json()
+
+  def __delitem__(self, key):
+    del self.db[key]
+
+  def keys(self):
+    return self.db.keys()
+
+  def __contains__(self, key):
+    return key in self.db
+
+  def __iter__(self):
+    for x in self.db:
+      yield x
+
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()
 
@@ -136,6 +192,15 @@ class VCSRepo(object):
     """
     raise NotImplementedError
 
+  @property
+  def commit_cache(self):
+    try:
+      return self._commit_cache
+    except AttributeError:
+      commit_cache_path = os.path.join(self.private_path, 'commit-cache.db')
+      self._commit_cache = CommitLogCache(commit_cache_path)
+      return self._commit_cache
+
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)
     return subprocess.check_output(cmd, **kwargs)
@@ -145,6 +210,11 @@ class VCSRepo(object):
     path = path.lstrip('/')
     path = multislash_rx.sub('/', path)
     return path
+
+  @abstractmethod
+  def canonical_rev(self, rev):
+    """Get the canonical revision identifier"""
+    raise NotImplementedError
 
   @abstractmethod
   def ls(self, rev, path, recursive=False, recursive_dirs=False,

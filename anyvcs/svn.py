@@ -121,6 +121,15 @@ class SvnRepo(VCSRepo):
     else:
       return (rev, '/' + head)
 
+  def canonical_rev(self, rev):
+    if isinstance(rev, int):
+      return rev
+    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+      return int(rev)
+    else:
+      rev, prefix = self._maprev(rev)
+      return rev
+
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
     rev, prefix = self._maprev(rev)
@@ -342,6 +351,9 @@ class SvnRepo(VCSRepo):
   def _logentry(self, rev, path, history=None):
     revstr = str(rev)
     cmd = [SVNLOOK, 'info', '.', '-r', revstr]
+    entry = self.commit_cache.get(revstr)
+    if entry:
+      return entry
     output = self._command(cmd)
     author, date, logsize, message = output.split('\n', 3)
     date = parse_isodate(date)
@@ -361,7 +373,10 @@ class SvnRepo(VCSRepo):
             parents.append(h[0].rev)
           else:
             parents.append('%s:%d' % (head, h[0].rev))
-    return CommitLogEntry(rev, parents, date, author, message)
+    entry = CommitLogEntry(rev, parents, date, author, message)
+    if revstr not in self.commit_cache:
+      self.commit_cache[revstr] = entry
+    return entry
 
   def pdiff(self, rev):
     rev, prefix = self._maprev(rev)

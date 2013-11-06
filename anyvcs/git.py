@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import re
 import stat
 import subprocess
@@ -22,6 +23,7 @@ from common import *
 
 GIT = 'git'
 
+canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
 ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?P<object>[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
@@ -36,7 +38,6 @@ class GitRepo(VCSRepo):
 
   @property
   def private_path(self):
-    import os
     path = os.path.join(self.path, '.private')
     try:
       os.mkdir(path)
@@ -45,6 +46,13 @@ class GitRepo(VCSRepo):
       if e.errno != errno.EEXIST:
         raise
     return path
+
+  def canonical_rev(self, rev):
+    if isinstance(rev, str) and canonical_rev_rx.match(rev):
+      return rev
+    else:
+      cmd = [GIT, 'rev-parse', rev]
+      return self._command(cmd)
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
@@ -87,7 +95,6 @@ class GitRepo(VCSRepo):
 
     if 'commit' in report:
       import anydbm
-      import os
       object_cache_path = os.path.join(self.private_path, 'object-cache.db')
       object_cache = anydbm.open(object_cache_path, 'c')
 
@@ -224,6 +231,9 @@ class GitRepo(VCSRepo):
         else:
           cmd.append(revrange[0] + '..' + revrange[1])
     else:
+      entry = self.commit_cache.get(self.canonical_rev(revrange))
+      if entry:
+        return entry
       cmd.extend(['-1', revrange])
       single = True
     if path:
@@ -238,6 +248,8 @@ class GitRepo(VCSRepo):
       parents = parents.split()
       date = parse_isodate(date)
       entry = CommitLogEntry(rev, parents, date, author, message)
+      if rev not in self.commit_cache:
+        self.commit_cache[rev] = entry
       if single:
         return entry
       results.append(entry)
