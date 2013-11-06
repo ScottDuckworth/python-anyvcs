@@ -142,7 +142,7 @@ class SvnRepo(VCSRepo):
         path = path.rstrip('/')
     if path == '/':
       if directory:
-        entry = attrdict(type='d')
+        entry = attrdict(path='/', type='d')
         if 'commit' in report:
           entry.commit = self._history(revstr, '/', 1)[0].rev
         return [entry]
@@ -175,7 +175,7 @@ class SvnRepo(VCSRepo):
         lines = lines[1:]
     for name in lines:
       entry_name = name[ltrim:]
-      entry = attrdict()
+      entry = attrdict(path=name.strip('/'))
       if name.endswith('/'):
         if recursive and not recursive_dirs:
           continue

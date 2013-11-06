@@ -97,7 +97,7 @@ class HgRepo(VCSRepo):
       t, name, objid = m.group('type', 'name', 'object')
       if name.startswith(prefix) or (not forcedir and name == path):
         if directory and name.startswith(prefix):
-          yield ('d', '', None)
+          yield ('d', path, '', None)
           return
         exists = True
         entry_name = name[ltrim:]
@@ -107,14 +107,14 @@ class HgRepo(VCSRepo):
             d = p.next()
             if d not in dirs:
               dirs.add(d)
-              yield ('d', d, None)
+              yield ('d', prefix+d, d, None)
             continue
           if recursive_dirs:
             for d in p:
               if d not in dirs:
                 dirs.add(d)
-                yield ('d', d, None)
-        yield (t, entry_name, objid)
+                yield ('d', prefix+d, d, None)
+        yield (t, name, entry_name, objid)
     if not exists:
       raise PathDoesNotExist(rev, path)
 
@@ -124,7 +124,7 @@ class HgRepo(VCSRepo):
     path = type(self).cleanPath(path)
     if path == '':
       if directory:
-        entry = attrdict(type='d')
+        entry = attrdict(path='/', type='d')
         if 'commit' in report:
           entry.commit = self.canonical_rev(revstr)
         return [entry]
@@ -162,8 +162,8 @@ class HgRepo(VCSRepo):
 
     results = []
     lookup_commit = {}
-    for t, name, objid in self._ls(revstr, path, recursive, recursive_dirs, directory):
-      entry = attrdict()
+    for t, fullpath, name, objid in self._ls(revstr, path, recursive, recursive_dirs, directory):
+      entry = attrdict(path=fullpath)
       if name:
         entry.name = name
       if t == 'd':

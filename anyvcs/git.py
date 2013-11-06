@@ -66,7 +66,7 @@ class GitRepo(VCSRepo):
     # make sure the path exists
     if path == '':
       if directory:
-        entry = attrdict(type='d')
+        entry = attrdict(path='/', type='d')
         if 'commit' in report:
           cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev]
           entry.commit = self._command(cmd)
@@ -106,7 +106,7 @@ class GitRepo(VCSRepo):
       if recursive_dirs and path == name + '/':
         continue
       assert name.startswith(path), 'unexpected output: ' + line
-      entry = attrdict()
+      entry = attrdict(path=name)
       entry_name = name[ltrim:].lstrip('/')
       if entry_name:
         entry.name = entry_name

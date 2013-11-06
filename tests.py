@@ -121,6 +121,10 @@ class VCSTest(unittest.TestCase):
   def decode_tag(cls, s):
     return s
 
+  @classmethod
+  def branch_prefix(cls, branch):
+    return ''
+
 class GitTest(VCSTest):
   @classmethod
   def setUpRepos(cls):
@@ -199,13 +203,13 @@ class SvnTest(VCSTest):
   @classmethod
   def encode_branch(cls, s):
     if s == 'trunk':
-      return s
+      return 'trunk'
     return 'branches/' + s
 
   @classmethod
   def decode_branch(cls, s):
     if s == 'trunk':
-      return s
+      return 'trunk'
     assert s.startswith('branches/')
     return s[9:]
 
@@ -217,6 +221,12 @@ class SvnTest(VCSTest):
   def decode_tag(cls, s):
     assert s.startswith('tags/')
     return s[5:]
+
+  @classmethod
+  def branch_prefix(cls, branch):
+    if branch == 'trunk':
+      return 'trunk/'
+    return 'branches/' + branch + '/'
 
 
 class Action(object):
@@ -533,81 +543,81 @@ class BasicTest(object):
   def test_ls1(self):
     result = self.repo.ls(self.main_branch, '')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
+      {'path':'a', 'name':'a', 'type':'f'},
+      {'path':'b', 'name':'b', 'type':'l'},
+      {'path':'c', 'name':'c', 'type':'d'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls2(self):
     result = self.repo.ls(self.main_branch, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
+      {'path':'a', 'name':'a', 'type':'f'},
+      {'path':'b', 'name':'b', 'type':'l'},
+      {'path':'c', 'name':'c', 'type':'d'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls3(self):
     result = self.repo.ls(self.main_branch, '/a')
-    correct = [{'type':'f'}]
+    correct = [{'path':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls4(self):
     result = self.repo.ls(self.main_branch, '/b')
-    correct = [{'type':'l'}]
+    correct = [{'path':'b', 'type':'l'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls5(self):
     result = self.repo.ls(self.main_branch, '/c')
     correct = [
-      {'name':'d', 'type':'d'}
+      {'path':'c/d', 'name':'d', 'type':'d'}
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls6(self):
     result = self.repo.ls(self.main_branch, '/c/')
     correct = [
-      {'name':'d', 'type':'d'}
+      {'path':'c/d', 'name':'d', 'type':'d'}
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls7(self):
     result = self.repo.ls(self.main_branch, '/c/d', directory=True)
-    correct = [{'type':'d'}]
+    correct = [{'path':'c/d', 'type':'d'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls8(self):
     result = self.repo.ls(self.main_branch, '/c/d/', directory=True)
-    correct = [{'type':'d'}]
+    correct = [{'path':'c/d', 'type':'d'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls9(self):
     result = self.repo.ls(self.main_branch, '/', directory=True)
-    correct = [{'type':'d'}]
+    correct = [{'path':'/', 'type':'d'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls10(self):
     result = self.repo.ls(self.main_branch, '/a', directory=True)
-    correct = [{'type':'f'}]
+    correct = [{'path':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls11(self):
     result = self.repo.ls(self.main_branch, '/c/d/')
     correct = [
-      {'name':'e', 'type':'f'},
-      {'name':'f', 'type':'l'},
+      {'path':'c/d/e', 'name':'e', 'type':'f'},
+      {'path':'c/d/f', 'name':'f', 'type':'l'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls12(self):
     result = self.repo.ls(self.main_branch, '/c/d', directory=True)
-    correct = [{'type':'d'}]
+    correct = [{'path':'c/d', 'type':'d'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls13(self):
     result = self.repo.ls(self.main_branch, '/c/d/', directory=True)
-    correct = [{'type':'d'}]
+    correct = [{'path':'c/d', 'type':'d'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_error1(self):
@@ -619,90 +629,90 @@ class BasicTest(object):
   def test_ls_recursive(self):
     result = self.repo.ls(self.main_branch, '/', recursive=True)
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c/d/e', 'type':'f'},
-      {'name':'c/d/f', 'type':'l'},
+      {'path':'a',     'name':'a',     'type':'f'},
+      {'path':'b',     'name':'b',     'type':'l'},
+      {'path':'c/d/e', 'name':'c/d/e', 'type':'f'},
+      {'path':'c/d/f', 'name':'c/d/f', 'type':'l'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_recursive_dirs(self):
     result = self.repo.ls(self.main_branch, '/', recursive=True, recursive_dirs=True)
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
-      {'name':'c/d', 'type':'d'},
-      {'name':'c/d/e', 'type':'f'},
-      {'name':'c/d/f', 'type':'l'},
+      {'path':'a',     'name':'a',     'type':'f'},
+      {'path':'b',     'name':'b',     'type':'l'},
+      {'path':'c',     'name':'c',     'type':'d'},
+      {'path':'c/d',   'name':'c/d',   'type':'d'},
+      {'path':'c/d/e', 'name':'c/d/e', 'type':'f'},
+      {'path':'c/d/f', 'name':'c/d/f', 'type':'l'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_size(self):
     result = self.repo.ls(self.main_branch, '/', report=('size',))
     correct = [
-      {'name':'a', 'type':'f', 'size':6},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
+      {'path':'a', 'name':'a', 'type':'f', 'size':6},
+      {'path':'b', 'name':'b', 'type':'l'},
+      {'path':'c', 'name':'c', 'type':'d'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_target(self):
     result = self.repo.ls(self.main_branch, '/', report=('target',))
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'l', 'target':'a'},
-      {'name':'c', 'type':'d'},
+      {'path':'a', 'name':'a', 'type':'f'},
+      {'path':'b', 'name':'b', 'type':'l', 'target':'a'},
+      {'path':'c', 'name':'c', 'type':'d'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_executable1(self):
     result = self.repo.ls(self.main_branch, '/', report=('executable',))
     correct = [
-      {'name':'a', 'type':'f', 'executable':False},
-      {'name':'b', 'type':'l'},
-      {'name':'c', 'type':'d'},
+      {'path':'a', 'name':'a', 'type':'f', 'executable':False},
+      {'path':'b', 'name':'b', 'type':'l'},
+      {'path':'c', 'name':'c', 'type':'d'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_executable2(self):
     result = self.repo.ls(self.main_branch, '/c/d', report=('executable',))
     correct = [
-      {'name':'e', 'type':'f', 'executable':True},
-      {'name':'f', 'type':'l'},
+      {'path':'c/d/e', 'name':'e', 'type':'f', 'executable':True},
+      {'path':'c/d/f', 'name':'f', 'type':'l'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_commit1(self):
     result = self.repo.ls(self.main_branch, '/', report=('commit',))
     correct = [
-      {'name':'a', 'type':'f', 'commit':self.rev1},
-      {'name':'b', 'type':'l', 'commit':self.rev1},
-      {'name':'c', 'type':'d', 'commit':self.rev1},
+      {'path':'a', 'name':'a', 'type':'f', 'commit':self.rev1},
+      {'path':'b', 'name':'b', 'type':'l', 'commit':self.rev1},
+      {'path':'c', 'name':'c', 'type':'d', 'commit':self.rev1},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_commit2(self):
     result = self.repo.ls(self.main_branch, '/', directory=True, report=('commit',))
-    correct = [{'type':'d', 'commit':self.rev1}]
+    correct = [{'path':'/', 'type':'d', 'commit':self.rev1}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_commit3(self):
     result = self.repo.ls(self.main_branch, '/a', report=('commit',))
-    correct = [{'type':'f', 'commit':self.rev1}]
+    correct = [{'path':'a', 'type':'f', 'commit':self.rev1}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_commit4(self):
     result = self.repo.ls(self.main_branch, '/c/d', report=('commit',))
     correct = [
-      {'name':'e', 'type':'f', 'commit':self.rev1},
-      {'name':'f', 'type':'l', 'commit':self.rev1},
+      {'path':'c/d/e', 'name':'e', 'type':'f', 'commit':self.rev1},
+      {'path':'c/d/f', 'name':'f', 'type':'l', 'commit':self.rev1},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_ls_report_commit5(self):
     result = self.repo.ls(self.main_branch, '/c/d', directory=True, report=('commit',))
-    correct = [{'type':'d', 'commit':self.rev1}]
+    correct = [{'path':'c/d', 'type':'d', 'commit':self.rev1}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_cat1(self):
@@ -962,12 +972,14 @@ class UnrelatedBranchTest(object):
 
   def test_main_ls(self):
     result = self.repo.ls(self.main_branch, '/')
-    correct = [{'name':'a', 'type':'f'}]
+    branch_prefix = self.branch_prefix(self.main_branch)
+    correct = [{'path':branch_prefix+'a', 'name':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
   def test_branch1_ls(self):
     result = self.repo.ls(self.encode_branch('branch1'), '/')
-    correct = [{'name':'b', 'type':'f'}]
+    branch_prefix = self.branch_prefix('branch1')
+    correct = [{'path':branch_prefix+'b', 'name':'b', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
 class GitUnrelatedBranchTest(GitTest, UnrelatedBranchTest): pass
@@ -1104,17 +1116,19 @@ class BranchTestStep3(object):
 
   def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
-    correct = [{'name':'a', 'type':'f'}]
+    branch_prefix = self.branch_prefix(self.main_branch)
+    correct = [{'path':branch_prefix+'a', 'name':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
     self.assertEqual('step 2', result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
+    branch_prefix = self.branch_prefix('branch1')
     result = self.repo.ls(branch1, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
@@ -1247,9 +1261,10 @@ class BranchTestStep7(object):
 
   def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
+    branch_prefix = self.branch_prefix(self.main_branch)
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
@@ -1259,11 +1274,12 @@ class BranchTestStep7(object):
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
+    branch_prefix = self.branch_prefix('branch1')
     result = self.repo.ls(branch1, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
@@ -1275,11 +1291,12 @@ class BranchTestStep7(object):
 
   def test_branch1a(self):
     branch1a = self.encode_branch('branch1a')
+    branch_prefix = self.branch_prefix('branch1a')
     result = self.repo.ls(branch1a, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1a, '/a')
@@ -1291,10 +1308,11 @@ class BranchTestStep7(object):
 
   def test_branch2(self):
     branch2 = self.encode_branch('branch2')
+    branch_prefix = self.branch_prefix('branch2')
     result = self.repo.ls(branch2, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch2, '/a')
@@ -1488,9 +1506,10 @@ class BranchTestStep9(object):
 
   def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
+    branch_prefix = self.branch_prefix(self.main_branch)
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
@@ -1500,11 +1519,12 @@ class BranchTestStep9(object):
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
+    branch_prefix = self.branch_prefix('branch1')
     result = self.repo.ls(branch1, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
@@ -1610,11 +1630,12 @@ class BranchTestStep11(object):
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
+    branch_prefix = self.branch_prefix('branch1')
     result = self.repo.ls(branch1, '/')
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
@@ -1743,10 +1764,11 @@ class BranchTestStep13(object):
 
   def test_main(self):
     result = self.repo.ls(self.main_branch, '/')
+    branch_prefix = self.branch_prefix(self.main_branch)
     correct = [
-      {'name':'a', 'type':'f'},
-      {'name':'b', 'type':'f'},
-      {'name':'c', 'type':'f'},
+      {'path':branch_prefix+'a', 'name':'a', 'type':'f'},
+      {'path':branch_prefix+'b', 'name':'b', 'type':'f'},
+      {'path':branch_prefix+'c', 'name':'c', 'type':'f'},
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
