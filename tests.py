@@ -928,6 +928,11 @@ class SvnBasicTest(SvnTest, BasicTest):
     self.assertIsInstance(result[0], CommitLogEntry)
     self.assertEqual(self.rev1, result[0].rev)
 
+  def test_log_single(self):
+    result1 = self.repo.log(revrange=1, limit=1)
+    result2 = self.repo.log(revrange='1', limit=1)
+    self.assertEqual(result1.parents, result2.parents)
+    self.assertEqual(result1.parents, [0])
 
 ### TEST CASE: UnrelatedBranchTest ###
 
