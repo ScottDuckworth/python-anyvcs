@@ -782,35 +782,50 @@ class BasicTest(object):
     correct = 1
     self.assertEqual(result, correct)
 
-  def test_pdiff(self):
+  def test_pdiff_rev1(self):
     import errno
-    empty_path = os.path.join(self.dir, 'empty')
-    rev1_path = os.path.join(self.dir, 'rev1')
-    try:
-      shutil.rmtree(empty_path)
-    except OSError as e:
-      if e.errno != errno.ENOENT:
-        raise
-    try:
-      shutil.rmtree(rev1_path)
-    except OSError as e:
-      if e.errno != errno.ENOENT:
-        raise
-    os.mkdir(empty_path)
-    self.export(self.rev1, rev1_path)
+    path_a = os.path.join(self.dir, 'empty')
+    path_b = os.path.join(self.dir, 'pdiff_rev1')
+    shutil.rmtree(path_a, ignore_errors=True)
+    shutil.rmtree(path_b, ignore_errors=True)
+    os.mkdir(path_a)
+    self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.rev1)
-    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=empty_path, stdin=subprocess.PIPE)
+    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
     p.communicate(pdiff)
     self.assertEqual(p.returncode, 0)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
-    self.assertTrue(os.path.isfile(os.path.join(empty_path, 'b')))
-    os.unlink(os.path.join(empty_path, 'b'))
-    os.unlink(os.path.join(rev1_path, 'b'))
-    self.assertTrue(os.path.isfile(os.path.join(empty_path, 'c', 'd', 'f')))
-    os.unlink(os.path.join(empty_path, 'c', 'd', 'f'))
-    os.unlink(os.path.join(rev1_path, 'c', 'd', 'f'))
-    rc = subprocess.call(['diff', '-urN', empty_path, rev1_path])
+    self.assertTrue(os.path.isfile(os.path.join(path_a, 'b')))
+    os.unlink(os.path.join(path_a, 'b'))
+    os.unlink(os.path.join(path_b, 'b'))
+    self.assertTrue(os.path.isfile(os.path.join(path_a, 'c', 'd', 'f')))
+    os.unlink(os.path.join(path_a, 'c', 'd', 'f'))
+    os.unlink(os.path.join(path_b, 'c', 'd', 'f'))
+    rc = subprocess.call(['diff', '-urN', path_a, path_b])
+    self.assertEqual(rc, 0)
+
+  def test_pdiff_main(self):
+    import errno
+    path_a = os.path.join(self.dir, 'empty')
+    path_b = os.path.join(self.dir, 'pdiff_main')
+    shutil.rmtree(path_a, ignore_errors=True)
+    shutil.rmtree(path_b, ignore_errors=True)
+    os.mkdir(path_a)
+    self.export(self.rev1, path_b)
+    pdiff = self.repo.pdiff(self.main_branch)
+    p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
+    p.communicate(pdiff)
+    self.assertEqual(p.returncode, 0)
+    # symlinks are not reconstructed by patch, so just make sure the file exists
+    # then remove it so that diff works
+    self.assertTrue(os.path.isfile(os.path.join(path_a, 'b')))
+    os.unlink(os.path.join(path_a, 'b'))
+    os.unlink(os.path.join(path_b, 'b'))
+    self.assertTrue(os.path.isfile(os.path.join(path_a, 'c', 'd', 'f')))
+    os.unlink(os.path.join(path_a, 'c', 'd', 'f'))
+    os.unlink(os.path.join(path_b, 'c', 'd', 'f'))
+    rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(rc, 0)
 
   def test_blame(self):
