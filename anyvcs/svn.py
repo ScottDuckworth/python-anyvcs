@@ -115,9 +115,9 @@ class SvnRepo(VCSRepo):
     else:
       rev = self.youngest()
     if head is None:
-      return (rev, '')
+      return (rev, '/')
     elif head == 'HEAD':
-      return (rev, '')
+      return (rev, '/')
     else:
       return (rev, '/' + head)
 
