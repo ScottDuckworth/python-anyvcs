@@ -115,13 +115,13 @@ class HgRepo(VCSRepo):
 
     if 'commit' in report:
       import os, fcntl, tempfile, anydbm
-      commit_cache_path = os.path.join(self.private_path, 'commit-cache.log')
+      files_cache_path = os.path.join(self.private_path, 'files-cache.log')
       object_cache_path = os.path.join(self.private_path, 'object-cache.db')
       object_cache = anydbm.open(object_cache_path, 'c')
-      with open(commit_cache_path, 'a+') as commit_cache:
-        fcntl.lockf(commit_cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
-        commit_cache.seek(0)
-        log = commit_cache.read().split('\0')
+      with open(files_cache_path, 'a+') as files_cache:
+        fcntl.lockf(files_cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
+        files_cache.seek(0)
+        log = files_cache.read().split('\0')
         assert log.pop() == ''
         if log:
           startlog = int(log[-1].splitlines()[0]) + 1
@@ -139,7 +139,7 @@ class HgRepo(VCSRepo):
             style.flush()
             cmd = [HG, 'log', '--style', style.name, '-r', '%d:' % startlog]
             output = self._command(cmd)
-            commit_cache.write(output)
+            files_cache.write(output)
             extend = output.split('\0')
             assert extend.pop() == ''
             log.extend(extend)
