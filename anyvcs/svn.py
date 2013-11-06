@@ -364,6 +364,9 @@ class SvnRepo(VCSRepo):
     return CommitLogEntry(rev, parents, date, author, message)
 
   def pdiff(self, rev):
+    rev, prefix = self._maprev(rev)
+    if rev == 0:
+      return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
     output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
