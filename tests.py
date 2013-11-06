@@ -780,11 +780,13 @@ class BasicTest(object):
     result = self.repo.log(revrange=self.main_branch)
     self.assertIsInstance(result, CommitLogEntry)
     self.assertEqual(self.rev1, result.rev)
+    self.assertIsInstance(result.date, datetime.datetime)
 
   def test_log_rev(self):
     result = self.repo.log(revrange=self.rev1)
     self.assertIsInstance(result, CommitLogEntry)
     self.assertEqual(self.rev1, result.rev)
+    self.assertIsInstance(result.date, datetime.datetime)
 
   def test_in(self):
     self.assertIn(self.rev1, self.repo)
@@ -874,6 +876,7 @@ class GitBasicTest(GitTest, BasicTest):
     self.assertEqual(1, len(result))
     self.assertIsInstance(result[0], CommitLogEntry)
     self.assertEqual(self.rev1, result[0].rev)
+    self.assertIsInstance(result[0].date, datetime.datetime)
 
 class HgBasicTest(HgTest, BasicTest):
   def test_branches(self):
