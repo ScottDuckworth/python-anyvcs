@@ -25,6 +25,26 @@ GIT = 'git'
 
 canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
 ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?P<object>[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
+diff_tree_rx = re.compile(r"""
+  :
+  (?P<src_mode>[0-7]{6})
+  [ ]
+  (?P<dst_mode>[0-7]{6})
+  [ ]
+  (?P<src_object>[0-9a-f]{40})
+  [ ]
+  (?P<dst_object>[0-9a-f]{40})
+  [ ]
+  (?P<status>.)(?P<score>\d+)?
+  \0
+  (?P<src_path>[^\0]+)
+  \0
+  (?:
+    (?!:)
+    (?P<dst_path>[^\0]+)
+    \0
+  )?
+""", re.VERBOSE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
 blame_rx = re.compile(r'^(?P<rev>[0-9a-fA-F]{40})\t\((?P<author>[^\t]*)\t(?P<date>[^\t]+)\t\d+\)(?P<text>.*)$')
@@ -252,6 +272,19 @@ class GitRepo(VCSRepo):
         self.commit_cache[rev] = entry
       if single:
         return entry
+      results.append(entry)
+    return results
+
+  def changed(self, rev):
+    cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--root', rev]
+    output = self._command(cmd)
+    results = []
+    for m in diff_tree_rx.finditer(output):
+      status, src_path, dst_path = m.group('status', 'src_path', 'dst_path')
+      if dst_path:
+        entry = FileChangeInfo(dst_path, status, src_path)
+      else:
+        entry = FileChangeInfo(src_path, status)
       results.append(entry)
     return results
 

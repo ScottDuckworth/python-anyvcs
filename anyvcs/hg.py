@@ -349,6 +349,26 @@ class HgRepo(VCSRepo):
       results.append(entry)
     return results
 
+  def changed(self, rev):
+    cmd = [HG, 'status', '-C', '--change', str(rev)]
+    output = self._command(cmd)
+    results = []
+    copy = None
+    for line in reversed(output.splitlines()):
+      if line.startswith(' '):
+        copy = line.lstrip()
+      else:
+        status, path = line.split(None, 1)
+        entry = FileChangeInfo(path, status, copy)
+        results.append(entry)
+        copy = None
+    results.reverse()
+    return results
+
+  def pdiff(self, rev):
+    cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
+    return self._command(cmd)[1:]
+
   def pdiff(self, rev):
     cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
     return self._command(cmd)[1:]

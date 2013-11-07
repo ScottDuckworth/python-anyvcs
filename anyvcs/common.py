@@ -152,6 +152,12 @@ class CommitLogCache(collections.MutableMapping):
     for x in self.db:
       yield x
 
+class FileChangeInfo(object):
+  def __init__(self, path, status, copy=None):
+    self.path = path
+    self.status = status
+    self.copy = copy
+
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()
 
@@ -342,6 +348,15 @@ class VCSRepo(object):
     ancestors (not inclusive. If A is None, follow branch B back to the
     beginning of history. If B is None, list all descendants in reverse
     chronological order.
+
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def changed(self, rev):
+    """Files that changed from the rev's parent(s)
+
+    Returns a list of FileChangeInfo items.
 
     """
     raise NotImplementedError

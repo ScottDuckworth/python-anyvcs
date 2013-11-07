@@ -480,6 +480,11 @@ class HgEmptyTest(HgTest, EmptyTest):
     result = self.repo.log()
     self.assertEqual(len(result), 0)
 
+  def test_changed(self):
+    result = self.repo.changed('null')
+    correct = []
+    self.assertEqual(correct, result)
+
 class SvnEmptyTest(SvnTest, EmptyTest):
   def test_branches(self):
     result = self.repo.branches()
@@ -500,6 +505,11 @@ class SvnEmptyTest(SvnTest, EmptyTest):
     result = self.repo.log()
     self.assertEqual(1, len(result))
     self.assertEqual(0, result[0].rev)
+
+  def test_changed(self):
+    result = self.repo.changed(0)
+    correct = []
+    self.assertEqual(correct, result)
 
   def test_pdiff(self):
     path_a = os.path.join(self.dir, 'empty')
@@ -860,7 +870,24 @@ class BasicTest(object):
     self.assertIsInstance(result[0].date, datetime.datetime)
     self.assertEqual('Pisgah', result[0].line)
 
-class GitBasicTest(GitTest, BasicTest):
+class GitLikeBasicTest(BasicTest):
+  def test_log_all(self):
+    result = self.repo.log()
+    self.assertIsInstance(result, list)
+    self.assertEqual(1, len(result))
+    self.assertIsInstance(result[0], CommitLogEntry)
+    self.assertEqual(self.rev1, result[0].rev)
+    self.assertIsInstance(result[0].date, datetime.datetime)
+
+  def test_changed(self):
+    result = self.repo.changed(self.rev1)
+    correct = ['a', 'b', 'c/d/e', 'c/d/f']
+    self.assertEqual(correct, sorted(x.path for x in result))
+    for x in result:
+      self.assertIsInstance(x.status, str)
+      self.assertLessEqual(1, len(x.status))
+
+class GitBasicTest(GitTest, GitLikeBasicTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = ['master']
@@ -873,18 +900,10 @@ class GitBasicTest(GitTest, BasicTest):
 
   def test_heads(self):
     result = self.repo.heads()
-    correct = ['master',]
+    correct = ['master']
     self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
-  def test_log_all(self):
-    result = self.repo.log()
-    self.assertIsInstance(result, list)
-    self.assertEqual(1, len(result))
-    self.assertIsInstance(result[0], CommitLogEntry)
-    self.assertEqual(self.rev1, result[0].rev)
-    self.assertIsInstance(result[0].date, datetime.datetime)
-
-class HgBasicTest(HgTest, BasicTest):
+class HgBasicTest(HgTest, GitLikeBasicTest):
   def test_branches(self):
     result = self.repo.branches()
     correct = ['default']
@@ -904,13 +923,6 @@ class HgBasicTest(HgTest, BasicTest):
     result = self.repo.heads()
     correct = ['default', 'tip']
     self.assertEqual(normalize_heads(correct), normalize_heads(result))
-
-  def test_log_all(self):
-    result = self.repo.log()
-    self.assertIsInstance(result, list)
-    self.assertEqual(1, len(result))
-    self.assertIsInstance(result[0], CommitLogEntry)
-    self.assertEqual(self.rev1, result[0].rev)
 
 class SvnBasicTest(SvnTest, BasicTest):
   def test_branches(self):
@@ -934,12 +946,21 @@ class SvnBasicTest(SvnTest, BasicTest):
     self.assertEqual(2, len(result))
     self.assertIsInstance(result[0], CommitLogEntry)
     self.assertEqual(self.rev1, result[0].rev)
+    self.assertIsInstance(result[0].date, datetime.datetime)
 
   def test_log_single(self):
     result1 = self.repo.log(revrange=1, limit=1)
     result2 = self.repo.log(revrange='1', limit=1)
     self.assertEqual(result1.parents, result2.parents)
     self.assertEqual(result1.parents, [0])
+
+  def test_changed(self):
+    result = self.repo.changed(self.rev1)
+    correct = ['a', 'b', 'c/', 'c/d/', 'c/d/e', 'c/d/f']
+    self.assertEqual(correct, sorted(x.path for x in result))
+    for x in result:
+      self.assertIsInstance(x.status, str)
+      self.assertLessEqual(1, len(x.status))
 
 ### TEST CASE: UnrelatedBranchTest ###
 
@@ -1329,6 +1350,18 @@ class BranchTestStep7(object):
     self.assertEqual(0, p.returncode)
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
+
+  def test_changed_rev2(self):
+    branch_prefix = self.branch_prefix(self.main_branch)
+    result = self.repo.changed(self.rev[2])
+    correct = [branch_prefix+'a']
+    self.assertEqual(correct, [x.path for x in result])
+
+  def test_changed_rev4(self):
+    branch_prefix = self.branch_prefix('branch1')
+    result = self.repo.changed(self.rev[4])
+    correct = [branch_prefix+'b']
+    self.assertEqual(correct, [x.path for x in result])
 
 class GitLikeBranchTestStep7(BranchTestStep7):
   def test_branches(self):

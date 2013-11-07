@@ -28,10 +28,9 @@ SVNLOOK = 'svnlook'
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
-changed_copy_info_rx = re.compile(r'^    \(from (?P<path>.+):r(?P<rev>\d+)\)')
+changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
-ChangeInfo = collections.namedtuple('ChangeInfo', 'status copy')
 
 class SvnRepo(VCSRepo):
   @classmethod
@@ -403,25 +402,27 @@ class SvnRepo(VCSRepo):
     finally:
       shutil.rmtree(tmpdir)
 
-  def _changed(self, rev):
+  def changed(self, rev):
+    rev, prefix = self._maprev(rev)
+    if rev == 0:
+      return []
     cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
     output = self._command(cmd)
     lines = output.splitlines()
     lines.reverse()
-    results = {}
+    results = []
     while lines:
       line = lines.pop()
       status = line[:3]
-      path = '/' + line[4:].lstrip('/')
+      path = line[4:].lstrip('/')
       copy = None
       if status.endswith('+'):
         line = lines.pop()
         m = changed_copy_info_rx.match(line)
         assert m
-        rev, p = m.group('rev', 'path')
-        p = '/' + path.lstrip('/')
-        copy = HistoryEntry(int(rev), p)
-      results[path] = ChangeInfo(status, copy)
+        copy = m.group('src')
+      entry = FileChangeInfo(path, status, copy)
+      results.append(entry)
     return results
 
   def _history(self, rev, path, limit=None):
