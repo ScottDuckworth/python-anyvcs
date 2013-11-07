@@ -256,7 +256,7 @@ class GitRepo(VCSRepo):
     return results
 
   def pdiff(self, rev):
-    cmd = [GIT, 'diff-tree', '-p', '-m', '--root', rev]
+    cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--root', rev]
     return self._command(cmd)
 
   def diff(self, rev_a, rev_b, path=None):
