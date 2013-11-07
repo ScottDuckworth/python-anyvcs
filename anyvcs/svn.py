@@ -287,66 +287,54 @@ class SvnRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    if revrange is None or revrange in ((None, None), [None, None]):
-      results = []
-      for rev, prefix in self._history(self.youngest(), '/', limit):
-        results.append(self._logentry(rev, prefix))
-      return results
-    elif isinstance(revrange, (tuple, list)):
-      path_filter = None
+    if not (revrange is None or isinstance(revrange, (tuple, list))):
+      # a single revision was given
+      rev, prefix = self._maprev(revrange)
+      h = self._history(rev, prefix, 1)
+      rev = h[0].rev
+      return self._logentry(rev, prefix)
+
+    if revrange is None:
+      results = self._history(self.youngest(), path or '/', limit)
+    else:
       if revrange[1] is None:
         include = set()
         rev1 = self.youngest()
         for head in self.heads():
           if head == 'HEAD':
             continue
-          prefix1 = type(self).cleanPath(head)
-          include.update(self._mergehistory(rev1, prefix1))
+          if path:
+            p = head + '/' + path.lstrip('/')
+          else:
+            p = type(self).cleanPath(head)
+          include.update(self._mergehistory(rev1, p, limit))
       else:
         rev1, prefix1 = self._maprev(revrange[1])
-        if firstparent:
-          include = self._history(rev1, prefix1)
+        if path:
+          p = type(self).cleanPath(prefix1 + '/' + path)
         else:
-          include = self._mergehistory(rev1, prefix1)
-        if path is not None:
-          path_filter = set([(type(self).cleanPath(prefix1), 0, rev1)])
+          p = prefix1
+        if firstparent:
+          include = self._history(rev1, p)
+        else:
+          include = self._mergehistory(rev1, p, limit)
+
       if revrange[0] is None:
         results = include
       else:
         rev0, prefix0 = self._maprev(revrange[0])
         exclude = self._mergehistory(rev0, prefix0)
         results = include - exclude
+
       results = sorted(results, key=lambda x: x.rev, reverse=True)
-      if path_filter is not None:
-        path = type(self).cleanPath(path)
-        _results = []
-        for r in results:
-          changed = self._changed(r.rev)
-          merge = set()
-          for prefix, minrev, maxrev in path_filter:
-            if minrev <= r.rev <= maxrev:
-              fullpath = prefix + path
-              if fullpath in changed:
-                mergeinfo = self._mergeinfo(r.rev, prefix)
-                merge.update(mergeinfo)
-                _results.append(r)
-                continue
-          path_filter.update(merge)
-        results = _results
-      if limit is not None:
-        results = results[:limit]
-      results = map(lambda x: self._logentry(x.rev, x.path), results)
-      if merges is not None:
-        if merges:
-          results = filter(lambda x: len(x.parents) > 1, results)
-        else:
-          results = filter(lambda x: len(x.parents) <= 1, results)
-      return results
-    else:
-      rev, prefix = self._maprev(revrange)
-      h = self._history(rev, prefix, 1)
-      rev = h[0].rev
-      return self._logentry(rev, prefix)
+
+    results = map(lambda x: self._logentry(x.rev, x.path), results)
+    if merges is not None:
+      if merges:
+        results = filter(lambda x: len(x.parents) > 1, results)
+      else:
+        results = filter(lambda x: len(x.parents) <= 1, results)
+    return results
 
   def _logentry(self, rev, path, history=None):
     revstr = str(rev)
