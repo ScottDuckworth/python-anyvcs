@@ -1778,7 +1778,7 @@ class BranchTestStep13(object):
     result = self.repo.cat(self.main_branch, '/c')
     self.assertEqual('step 5', result)
 
-class GitBranchTestStep13(GitTest, BranchTestStep13):
+class GitLikeBranchTestStep13(BranchTestStep13):
   def test_branches(self):
     result = self.repo.branches()
     correct = [self.encode_branch(self.main_branch)]
@@ -1787,11 +1787,6 @@ class GitBranchTestStep13(GitTest, BranchTestStep13):
   def test_log_main(self):
     result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
     correct = 15
-    self.assertEqual(correct, result)
-
-  def test_log_all(self):
-    result = [self.revrev[x.rev] for x in self.repo.log()]
-    correct = [15, 14, 13, 12, 11, 10, 8, 7, 5, 4, 2]
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
@@ -1804,30 +1799,16 @@ class GitBranchTestStep13(GitTest, BranchTestStep13):
     correct = [10, 4]
     self.assertEqual(correct, result)
 
-class HgBranchTestStep13(HgTest, BranchTestStep13):
-  def test_branches(self):
-    result = self.repo.branches()
-    correct = [self.encode_branch(self.main_branch)]
-    self.assertEqual(sorted(correct), sorted(result))
-
-  def test_log_main(self):
-    result = self.revrev[self.repo.log(revrange=self.main_branch).rev]
-    correct = 15
+class GitBranchTestStep13(GitTest, GitLikeBranchTestStep13):
+  def test_log_all(self):
+    result = [self.revrev[x.rev] for x in self.repo.log()]
+    correct = [15, 14, 13, 12, 11, 10, 8, 7, 5, 4, 2]
     self.assertEqual(correct, result)
 
+class HgBranchTestStep13(HgTest, GitLikeBranchTestStep13):
   def test_log_all(self):
     result = [self.revrev[x.rev] for x in self.repo.log()]
     correct = [18, 17, 16, 15, 14, 13, 12, 11, 10, 8, 7, 5, 4, 2]
-    self.assertEqual(correct, result)
-
-  def test_log_None_main(self):
-    result = [self.revrev[x.rev] for x in self.repo.log(revrange=(None, self.main_branch))]
-    correct = [15, 14, 13, 12, 11, 10, 8, 7, 5, 4, 2]
-    self.assertEqual(correct, result)
-
-  def test_log_None_main_path_b(self):
-    result = [self.revrev[x.rev] for x in self.repo.log(revrange=(None, self.main_branch), path='/b')]
-    correct = [10, 4]
     self.assertEqual(correct, result)
 
 class SvnBranchTestStep13(SvnTest, BranchTestStep13):
