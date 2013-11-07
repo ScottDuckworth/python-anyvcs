@@ -501,10 +501,9 @@ class SvnEmptyTest(SvnTest, EmptyTest):
     self.assertEqual(1, len(result))
     self.assertEqual(0, result[0].rev)
 
-  def test_pdiff_rev0(self):
-    import errno
+  def test_pdiff(self):
     path_a = os.path.join(self.dir, 'empty')
-    path_b = os.path.join(self.dir, 'pdiff_rev0')
+    path_b = os.path.join(self.dir, 'pdiff')
     shutil.rmtree(path_a, ignore_errors=True)
     shutil.rmtree(path_b, ignore_errors=True)
     os.mkdir(path_a)
@@ -809,7 +808,6 @@ class BasicTest(object):
     self.assertEqual(correct, result)
 
   def test_pdiff_rev1(self):
-    import errno
     path_a = os.path.join(self.dir, 'empty')
     path_b = os.path.join(self.dir, 'pdiff_rev1')
     shutil.rmtree(path_a, ignore_errors=True)
@@ -832,7 +830,6 @@ class BasicTest(object):
     self.assertEqual(0, rc)
 
   def test_pdiff_main(self):
-    import errno
     path_a = os.path.join(self.dir, 'empty')
     path_b = os.path.join(self.dir, 'pdiff_main')
     shutil.rmtree(path_a, ignore_errors=True)
