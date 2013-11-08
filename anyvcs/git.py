@@ -223,9 +223,6 @@ class GitRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    if self.empty():
-      return []
-
     cmd = [GIT, 'log', '-z', '--pretty=format:%H%n%P%n%ai%n%an <%ae>%n%B']
     if limit is not None:
       cmd.append('-' + str(limit))
@@ -238,10 +235,14 @@ class GitRepo(VCSRepo):
         cmd.append('--no-merges')
     single = False
     if revrange is None:
+      if self.empty():
+        return []
       cmd.append('--all')
     elif isinstance(revrange, (tuple, list)):
       if revrange[0] is None:
         if revrange[1] is None:
+          if self.empty():
+            return []
           cmd.append('--all')
         else:
           cmd.append(revrange[1])
