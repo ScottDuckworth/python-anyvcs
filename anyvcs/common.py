@@ -124,7 +124,6 @@ class CommitLogEntry(object):
 
 class CommitLogCache(HashDict):
   def __getitem__(self, key):
-    print 'GET', key
     value = HashDict.__getitem__(self, key)
     value = CommitLogEntry.from_json(value)
     if value:
