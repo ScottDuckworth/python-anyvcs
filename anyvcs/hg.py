@@ -58,6 +58,15 @@ class HgRepo(VCSRepo):
         raise
     return path
 
+  @property
+  def _object_cache(self):
+    try:
+      return self._object_cache_v
+    except AttributeError:
+      object_cache_path = os.path.join(self.private_path, 'object-cache')
+      self._object_cache_v = HashDict(object_cache_path)
+      return self._object_cache_v
+
   def canonical_rev(self, rev):
     if isinstance(rev, str) and canonical_rev_rx.match(rev):
       return rev
@@ -130,10 +139,8 @@ class HgRepo(VCSRepo):
         return [entry]
 
     if 'commit' in report:
-      import fcntl, tempfile, anydbm
+      import fcntl, tempfile
       files_cache_path = os.path.join(self.private_path, 'files-cache.log')
-      object_cache_path = os.path.join(self.private_path, 'object-cache.db')
-      object_cache = anydbm.open(object_cache_path, 'c')
       with open(files_cache_path, 'a+') as files_cache:
         fcntl.lockf(files_cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
         files_cache.seek(0)
@@ -184,7 +191,7 @@ class HgRepo(VCSRepo):
         lookup = True
         if objid:
           try:
-            entry.commit = object_cache[objid]
+            entry.commit = self._object_cache[objid]
             lookup = False
           except KeyError:
             pass
@@ -218,7 +225,7 @@ class HgRepo(VCSRepo):
               entry, objid = lookup_commit[p]
               entry.commit = commit
               if objid:
-                object_cache[objid] = commit
+                self._object_cache[objid] = commit
               del lookup_commit[p]
               break
 

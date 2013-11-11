@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
-import anydbm
-import collections
 import datetime
 import json
 import os
@@ -24,6 +22,7 @@ import re
 import subprocess
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import namedtuple
+from .hashdict import HashDict
 
 multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
@@ -123,34 +122,18 @@ class CommitLogEntry(object):
       message = o['m'],
     )
 
-class CommitLogCache(collections.MutableMapping):
-  def __init__(self, path):
-    self.db = anydbm.open(path, 'c')
-
-  def __len__(self):
-    return len(self.db)
-
+class CommitLogCache(HashDict):
   def __getitem__(self, key):
-    value = CommitLogEntry.from_json(self.db[key])
+    print 'GET', key
+    value = HashDict.__getitem__(self, key)
+    value = CommitLogEntry.from_json(value)
     if value:
       return value
     raise KeyError(key)
 
   def __setitem__(self, key, value):
-    self.db[key] = value.to_json()
-
-  def __delitem__(self, key):
-    del self.db[key]
-
-  def keys(self):
-    return self.db.keys()
-
-  def __contains__(self, key):
-    return key in self.db
-
-  def __iter__(self):
-    for x in self.db:
-      yield x
+    value = value.to_json()
+    HashDict.__setitem__(self, key, value)
 
 class FileChangeInfo(object):
   def __init__(self, path, status, copy=None):
@@ -203,7 +186,7 @@ class VCSRepo(object):
     try:
       return self._commit_cache
     except AttributeError:
-      commit_cache_path = os.path.join(self.private_path, 'commit-cache.db')
+      commit_cache_path = os.path.join(self.private_path, 'commit-cache')
       self._commit_cache = CommitLogCache(commit_cache_path)
       return self._commit_cache
 

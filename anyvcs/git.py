@@ -20,6 +20,7 @@ import re
 import stat
 import subprocess
 from common import *
+from .hashdict import HashDict
 
 GIT = 'git'
 
@@ -67,6 +68,15 @@ class GitRepo(VCSRepo):
         raise
     return path
 
+  @property
+  def _object_cache(self):
+    try:
+      return self._object_cache_v
+    except AttributeError:
+      object_cache_path = os.path.join(self.private_path, 'object-cache')
+      self._object_cache_v = HashDict(object_cache_path)
+      return self._object_cache_v
+
   def canonical_rev(self, rev):
     if isinstance(rev, str) and canonical_rev_rx.match(rev):
       return rev
@@ -113,11 +123,6 @@ class GitRepo(VCSRepo):
     cmd.extend([rev, '--', path])
     output = self._command(cmd).rstrip('\0')
 
-    if 'commit' in report:
-      import anydbm
-      object_cache_path = os.path.join(self.private_path, 'object-cache.db')
-      object_cache = anydbm.open(object_cache_path, 'c')
-
     results = []
     for line in output.split('\0'):
       m = ls_tree_rx.match(line)
@@ -147,14 +152,11 @@ class GitRepo(VCSRepo):
         assert False, 'unexpected output: ' + line
       if 'commit' in report:
         try:
-          entry.commit = object_cache[objid]
+          entry.commit = self._object_cache[objid]
         except KeyError:
           cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', name]
-          entry.commit = object_cache[objid] = self._command(cmd)
+          entry.commit = self._object_cache[objid] = self._command(cmd)
       results.append(entry)
-
-    if 'commit' in report:
-      object_cache.close()
 
     return results
 
