@@ -532,3 +532,64 @@ class SvnRepo(VCSRepo):
     if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
     return self._blame(str(rev), path)
+
+  def dump(self, stream, progress=None, lower=None, upper=None,
+           incremental=False, deltas=False):
+    """Dump the repository to a dumpfile stream.
+
+    Arguments:
+    stream    A file stream to which the dumpfile is written
+    progress  A file stream to which progress is written
+
+    See `svnadmin help dump' for details on the other arguments.
+
+    """
+    cmd = [SVNADMIN, 'dump', '.']
+    if progress is None:
+      cmd.append('-q')
+    if lower is not None:
+      cmd.append('-r')
+      if upper is None:
+        cmd.append(str(int(lower)))
+      else:
+        cmd.append('%d:%d' % (int(lower), int(upper)))
+    if incremental:
+      cmd.append('--incremental')
+    if deltas:
+      cmd.append('--deltas')
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=stream, stderr=progress)
+    p.wait()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, cmd)
+
+  def load(self, stream, progress=None, ignore_uuid=False, force_uuid=False,
+           use_pre_commit_hook=False, use_post_commit_hook=False,
+           parent_dir=None):
+    """Load a dumpfile stream into the repository.
+
+    Arguments:
+    stream    A file stream from which the dumpfile is read
+    progress  A file stream to which progress is written
+
+    See `svnadmin help load' for details on the other arguments.
+
+    """
+    cmd = [SVNADMIN, 'load', '.']
+    if progress is None:
+      cmd.append('-q')
+    if ignore_uuid:
+      cmd.append('--ignore-uuid')
+    if force_uuid:
+      cmd.append('--force-uuid')
+    if use_pre_commit_hook:
+      cmd.append('--use-pre-commit-hook')
+    if use_post_commit_hook:
+      cmd.append('--use-post-commit-hook')
+    if parent_dir:
+      cmd.extend(['--parent-dir', parent_dir])
+    p = subprocess.Popen(cmd, cwd=self.path, stdin=stream,
+                         stdout=progress, stderr=subprocess.PIPE)
+    stderr = p.stderr.read()
+    p.wait()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
