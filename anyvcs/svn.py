@@ -338,7 +338,7 @@ class SvnRepo(VCSRepo):
   def _logentry(self, rev, path, history=None):
     revstr = str(rev)
     cmd = [SVNLOOK, 'info', '.', '-r', revstr]
-    entry = self.commit_cache.get(revstr)
+    entry = self._commit_cache.get(revstr)
     if entry:
       return entry
     output = self._command(cmd)
@@ -361,8 +361,8 @@ class SvnRepo(VCSRepo):
           else:
             parents.append('%s:%d' % (head, h[0].rev))
     entry = CommitLogEntry(rev, parents, date, author, message)
-    if revstr not in self.commit_cache:
-      self.commit_cache[revstr] = entry
+    if revstr not in self._commit_cache:
+      self._commit_cache[revstr] = entry
     return entry
 
   def pdiff(self, rev):

@@ -254,7 +254,7 @@ class GitRepo(VCSRepo):
         else:
           cmd.append(revrange[0] + '..' + revrange[1])
     else:
-      entry = self.commit_cache.get(self.canonical_rev(revrange))
+      entry = self._commit_cache.get(self.canonical_rev(revrange))
       if entry:
         return entry
       cmd.extend(['-1', revrange])
@@ -271,8 +271,8 @@ class GitRepo(VCSRepo):
       parents = parents.split()
       date = parse_isodate(date)
       entry = CommitLogEntry(rev, parents, date, author, message)
-      if rev not in self.commit_cache:
-        self.commit_cache[rev] = entry
+      if rev not in self._commit_cache:
+        self._commit_cache[rev] = entry
       if single:
         return entry
       results.append(entry)

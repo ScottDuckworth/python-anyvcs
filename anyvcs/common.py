@@ -182,13 +182,13 @@ class VCSRepo(object):
     raise NotImplementedError
 
   @property
-  def commit_cache(self):
+  def _commit_cache(self):
     try:
-      return self._commit_cache
+      return self._commit_cache_v
     except AttributeError:
       commit_cache_path = os.path.join(self.private_path, 'commit-cache')
-      self._commit_cache = CommitLogCache(commit_cache_path)
-      return self._commit_cache
+      self._commit_cache_v = CommitLogCache(commit_cache_path)
+      return self._commit_cache_v
 
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)

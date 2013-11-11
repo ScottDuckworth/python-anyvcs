@@ -328,7 +328,7 @@ class HgRepo(VCSRepo):
         else:
           cmd.extend(['-r', 'reverse(ancestors(%s))' % revrange[1], '--prune', str(revrange[0])])
     else:
-      entry = self.commit_cache.get(self.canonical_rev(revrange))
+      entry = self._commit_cache.get(self.canonical_rev(revrange))
       if entry:
         return entry
       cmd.extend(['-r', str(revrange)])
@@ -349,8 +349,8 @@ class HgRepo(VCSRepo):
       date = parse_hgdate(date)
       message = message.replace('\n\t', '\n')
       entry = CommitLogEntry(rev, parents, date, author, message)
-      if rev not in self.commit_cache:
-        self.commit_cache[rev] = entry
+      if rev not in self._commit_cache:
+        self._commit_cache[rev] = entry
       if single:
         return entry
       results.append(entry)
