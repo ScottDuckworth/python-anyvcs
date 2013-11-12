@@ -122,6 +122,8 @@ class GitRepo(VCSRepo):
       cmd.append('-l')
     cmd.extend([rev, '--', path])
     output = self._command(cmd).rstrip('\0')
+    if not output:
+      return []
 
     results = []
     for line in output.split('\0'):

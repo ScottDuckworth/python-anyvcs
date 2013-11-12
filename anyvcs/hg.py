@@ -95,9 +95,11 @@ class HgRepo(VCSRepo):
     else:
       ltrim = len(path) + 1
       prefix = path + '/'
-
     cmd = [HG, 'manifest', '--debug', '-r', rev]
     output = self._command(cmd)
+    if not output:
+      return
+
     dirs = set()
     exists = False
     for line in output.splitlines():
