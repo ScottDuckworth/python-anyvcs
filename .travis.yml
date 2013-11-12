@@ -5,4 +5,8 @@ python:
   - "3.2"
   - "3.3"
 install: pip install .
-script: python tests.py
+script:
+  - git --version
+  - hg --version
+  - svn --version
+  - python tests.py
