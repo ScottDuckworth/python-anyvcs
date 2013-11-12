@@ -42,7 +42,15 @@ def check_call(args, **kwargs):
 def check_output(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stderr', logfile)
-  return subprocess.check_output(args, **kwargs)
+  try:
+    return subprocess.check_output(args, **kwargs)
+  except AttributeError: # subprocess.check_output added in python 2.7
+    kwargs.setdefault('stdout', subprocess.PIPE)
+    p = subprocess.Popen(args, **kwargs)
+    stdout, stderr = p.communicate()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, args)
+    return stdout
 
 def normalize_ls(x):
   return sorted(x, key=lambda y: y.get('name'))
@@ -61,12 +69,6 @@ def normalize_logmsg(x):
 
 class VCSTest(unittest.TestCase):
   __metaclass__ = ABCMeta
-
-  def setUp(self):
-    try:
-      self.dir
-    except AttributeError:
-      self.setUpClass()
 
   @classmethod
   def setUpClass(cls):
@@ -124,6 +126,28 @@ class VCSTest(unittest.TestCase):
   @classmethod
   def branch_prefix(cls, branch):
     return ''
+
+  def setUp(self):
+    try:
+      self.dir
+    except AttributeError:
+      self.setUpClass()
+
+  if not hasattr(unittest.TestCase, 'assertIsInstance'):
+    def assertIsInstance(self, obj, cls, msg=None):
+      self.assertTrue(isinstance(obj, cls), msg)
+
+  if not hasattr(unittest.TestCase, 'assertIn'):
+    def assertIn(self, member, container, msg=None):
+      self.assertTrue(member in container, msg)
+
+  if not hasattr(unittest.TestCase, 'assertNotIn'):
+    def assertNotIn(self, member, container, msg=None):
+      self.assertTrue(member not in container, msg)
+
+  if not hasattr(unittest.TestCase, 'assertLessEqual'):
+    def assertLessEqual(self, a, b, msg=None):
+      self.assertTrue(a <= b, msg)
 
 class GitTest(VCSTest):
   @classmethod
