@@ -3,6 +3,8 @@ python-anyvcs
 
 A Python abstraction layer for multiple version control systems.
 
+[![Build Status](https://travis-ci.org/ScottDuckworth/python-anyvcs.png)](https://travis-ci.org/ScottDuckworth/python-anyvcs)
+
 Example usage:
 
     >>> from pprint import pprint
