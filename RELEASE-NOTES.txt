@@ -1,0 +1,46 @@
+Release Notes for python-anyvcs
+===============================
+
+1.2.0 (2013-11-12)
+------------------
+
+* Add the following methods and properties to VCSRepo:
+    * private_path
+    * canonical_rev()
+    * __contains__()
+    * __len__()
+    * changed()
+    * blame()
+* Add dump() and load() to SvnRepo
+* Add commit reporting to ls()
+* Add caching to log()
+* Add caching to ls() for GitRepo and HgRepo
+* Many bug fixes and performance improvements
+* Changed copyright information to Clemson University
+
+1.1.1 (2013-10-01)
+------------------
+
+* Fix incorrect file type checking in cat() and readlink()
+
+1.1.0 (2013-10-01)
+------------------
+
+* Allow log() revrange parameter to be a list
+
+1.0.2 (2013-10-01)
+------------------
+
+* Fix incorrect file type checking in cat() and readlink()
+
+1.0.1 (2013-09-27)
+------------------
+
+* Rename python package to anyvcs
+* Return HEAD in SvnRepo.branches()
+* Fix import error in unit tests
+
+1.0.0 (2013-09-24)
+------------------
+
+First release
