@@ -40,6 +40,7 @@ else:
 UTC = UTCOffset(0, 'UTC')
 
 def check_call(args, **kwargs):
+  print kwargs
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stdout', logfile)
   kwargs.setdefault('stderr', logfile)
