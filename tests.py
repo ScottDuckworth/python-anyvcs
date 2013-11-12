@@ -62,6 +62,12 @@ def normalize_logmsg(x):
 class VCSTest(unittest.TestCase):
   __metaclass__ = ABCMeta
 
+  def setUp(self):
+    try:
+      self.dir
+    except AttributeError:
+      self.setUpClass()
+
   @classmethod
   def setUpClass(cls):
     cls.dir = tempfile.mkdtemp(prefix='anyvcs-test.')
