@@ -8,4 +8,4 @@ before_script:
   - hg --version --quiet
   - svn --version --quiet
 script:
-  - export TEST_LOG_FILE=`mktemp`; python tests.py || (cat $TEST_LOG_FILE; false)
+  - export TEST_LOG_FILE=`mktemp`; python tests.py -v || (cat $TEST_LOG_FILE; false)
