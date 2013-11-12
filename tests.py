@@ -124,6 +124,8 @@ class GitTest(VCSTest):
   def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'git')
     check_call(['git', 'clone', cls.main_path, cls.working_path])
+    cls.check_call(['git', 'config', 'user.email', 'me@example.com'])
+    cls.check_call(['git', 'config', 'user.name', 'Test User'])
     cls.main_branch = 'master'
     cls.working_head = 'master'
     for action in cls.setUpWorkingCopy(cls.working_path):
@@ -152,6 +154,8 @@ class HgTest(VCSTest):
   def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'hg')
     check_call(['hg', 'clone', cls.main_path, cls.working_path])
+    with open(os.path.join(cls.working_path, '.hg', 'hgrc'), 'a') as hgrc:
+      hgrc.write('[ui]\nusername = Test User <me@example.com>\n')
     cls.main_branch = 'default'
     cls.working_head = 'default'
     for action in cls.setUpWorkingCopy(cls.working_path):
