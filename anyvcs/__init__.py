@@ -18,6 +18,11 @@
 __version__ = '1.2.0'
 
 def create(path, vcs):
+  """Create a new repository
+
+  vcs is either 'git', 'hg', or 'svn'
+
+  """
   from common import UnknownVCSType
   if vcs == 'git':
     from git import GitRepo
@@ -33,6 +38,11 @@ def create(path, vcs):
   return cls.create(path)
 
 def open(path, vcs=None):
+  """Open an existing repository
+
+  vcs can be specified to avoid auto-detection of repository type
+
+  """
   import os
   from common import UnknownVCSType
   assert os.path.isdir(path), path + ' is not a directory'

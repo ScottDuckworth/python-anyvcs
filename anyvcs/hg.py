@@ -41,14 +41,27 @@ def parse_hgdate(datestr):
   return date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
 
 class HgRepo(VCSRepo):
+  """A Mercurial repository
+
+  Valid revisions are anything that Mercurial considers as a revision.
+
+  """
+
   @classmethod
   def create(cls, path):
+    """Create a new repository"""
     cmd = [HG, 'init', path]
     subprocess.check_call(cmd)
     return cls(path)
 
   @property
   def private_path(self):
+    """Get the path to a directory which can be used to store arbitrary data
+
+    This directory should not conflict with any of the repository internals.
+    The directory should be created if it does not already exist.
+
+    """
     path = os.path.join(self.path, '.hg', '.private')
     try:
       os.mkdir(path)
@@ -271,6 +284,7 @@ class HgRepo(VCSRepo):
     return self._parse_heads(cmd)
 
   def bookmarks(self):
+    """Get list of bookmarks"""
     cmd = [HG, 'bookmarks']
     output = self._command(cmd)
     if output.startswith('no bookmarks set'):
