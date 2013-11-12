@@ -4,6 +4,6 @@ python:
 install: pip install .
 script:
   - git --version
-  - hg --version
-  - svn --version
-  - python tests.py
+  - hg --version --quiet
+  - svn --version --quiet
+  - TEST_LOG_FILE=`mktemp`; python tests.py || (cat $TEST_LOG_FILE; false)

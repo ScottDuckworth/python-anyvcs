@@ -28,19 +28,12 @@ import xml.etree.ElementTree as ET
 from abc import ABCMeta, abstractmethod
 from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
 
-debug_to_stdout = False
 keep_test_dir = False
 
-if debug_to_stdout:
-  import sys
-  logfile = sys.stdout
-else:
-  logfile = open(os.devnull, 'w')
-
+logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
 def check_call(args, **kwargs):
-  print args, kwargs
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stdout', logfile)
   kwargs.setdefault('stderr', logfile)
