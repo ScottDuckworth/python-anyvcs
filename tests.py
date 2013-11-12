@@ -284,7 +284,12 @@ class Commit(Action):
     xml = test.check_output(['svn', 'status', '--xml'])
     tree = ET.fromstring(xml)
     for entry in tree.iter('entry'):
-      test.check_call(['svn', 'add', '--force', '-q', entry.attrib.get('path')])
+      path = entry.attrib.get('path')
+      status = entry.find('wc-status').attrib.get('item')
+      if status == 'missing':
+        test.check_call(['svn', 'delete', '--force', '-q', path])
+      else:
+        test.check_call(['svn', 'add', '--force', '-q', path])
     test.check_call(['svn', 'commit', '-m', self.message])
     test.check_call(['svn', 'update'])
 
@@ -524,6 +529,33 @@ class SvnEmptyTest(SvnTest, EmptyTest):
     self.assertEqual(0, p.returncode)
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
+
+
+### TEST CASE: EmptyWithCommitsTest ###
+
+class EmptyWithCommitsTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    a = os.path.join(working_path, 'a')
+    with open(a, 'w') as f:
+      f.write('blah')
+    yield Commit('create a')
+    os.unlink(a)
+    yield Commit('delete a')
+
+  def test_empty(self):
+    result = self.repo.empty()
+    correct = False
+    self.assertEqual(correct, result)
+
+  def test_ls(self):
+    result = self.repo.ls(self.main_branch, '')
+    correct = []
+    self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+class GitEmptyWithCommitsTest(GitTest, EmptyWithCommitsTest): pass
+class HgEmptyWithCommitsTest(HgTest, EmptyWithCommitsTest): pass
+class SvnEmptyWithCommitsTest(SvnTest, EmptyWithCommitsTest): pass
 
 
 ### TEST CASE: BasicTest ###
