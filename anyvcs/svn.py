@@ -1,4 +1,4 @@
-# Copyright 2013 Scott Duckworth
+# Copyright 2013 Clemson University
 #
 # This file is part of python-anyvcs.
 #
@@ -28,10 +28,9 @@ SVNLOOK = 'svnlook'
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
-changed_copy_info_rx = re.compile(r'^    \(from (?P<path>.+):r(?P<rev>\d+)\)')
+changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
-ChangeInfo = collections.namedtuple('ChangeInfo', 'status copy')
 
 class SvnRepo(VCSRepo):
   @classmethod
@@ -51,6 +50,18 @@ class SvnRepo(VCSRepo):
     super(SvnRepo, self).__init__(path)
     self.branch_glob = ['/trunk/', '/branches/*/']
     self.tag_glob = ['/tags/*/']
+
+  @property
+  def private_path(self):
+    import os
+    path = os.path.join(self.path, '.private')
+    try:
+      os.mkdir(path)
+    except OSError as e:
+      import errno
+      if e.errno != errno.EEXIST:
+        raise
+    return path
 
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
@@ -103,15 +114,25 @@ class SvnRepo(VCSRepo):
     else:
       rev = self.youngest()
     if head is None:
-      return (rev, '')
+      return (rev, '/')
     elif head == 'HEAD':
-      return (rev, '')
+      return (rev, '/')
     else:
       return (rev, '/' + head)
+
+  def canonical_rev(self, rev):
+    if isinstance(rev, int):
+      return rev
+    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+      return int(rev)
+    else:
+      rev, prefix = self._maprev(rev)
+      return rev
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
     rev, prefix = self._maprev(rev)
+    revstr = str(rev)
     path = type(self).cleanPath(prefix + path)
     forcedir = False
     if path.endswith('/'):
@@ -120,14 +141,17 @@ class SvnRepo(VCSRepo):
         path = path.rstrip('/')
     if path == '/':
       if directory:
-        return [{'type':'d'}]
+        entry = attrdict(path='/', type='d')
+        if 'commit' in report:
+          entry.commit = self._history(revstr, '/', 1)[0].rev
+        return [entry]
       ltrim = 1
       prefix = '/'
     else:
       ltrim = len(path) + 1
       prefix = path + '/'
 
-    cmd = [SVNLOOK, 'tree', '-r', str(rev), '--full-paths']
+    cmd = [SVNLOOK, 'tree', '-r', revstr, '--full-paths']
     if not recursive:
       cmd.append('--non-recursive')
     cmd.extend(['.', path])
@@ -150,16 +174,16 @@ class SvnRepo(VCSRepo):
         lines = lines[1:]
     for name in lines:
       entry_name = name[ltrim:]
-      entry = attrdict()
+      entry = attrdict(path=name.strip('/'))
       if name.endswith('/'):
         if recursive and not recursive_dirs:
           continue
         entry.type = 'd'
         entry_name = entry_name.rstrip('/')
       else:
-        proplist = self._proplist(str(rev), name)
+        proplist = self._proplist(revstr, name)
         if 'svn:special' in proplist:
-          link = self._cat(str(rev), name).split(None, 1)
+          link = self._cat(revstr, name).split(None, 1)
           if len(link) == 2 and link[0] == 'link':
             entry.type = 'l'
             if 'target' in report:
@@ -169,9 +193,11 @@ class SvnRepo(VCSRepo):
           if 'executable' in report:
             entry.executable = 'svn:executable' in proplist
           if 'size' in report:
-            entry.size = len(self._cat(str(rev), name))
+            entry.size = len(self._cat(revstr, name))
       if entry_name:
         entry.name = entry_name
+      if 'commit' in report:
+        entry.commit = self._history(revstr, name, 1)[0].rev
       results.append(entry)
     return results
 
@@ -245,72 +271,78 @@ class SvnRepo(VCSRepo):
     output = self._command(cmd)
     return len(output.splitlines()) < 4
 
+  def __contains__(self, rev):
+    rev, prefix = self._maprev(rev)
+    cmd = [SVNLOOK, 'history', '.', prefix, '-l1', '-r', str(rev)]
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    return p.returncode == 0
+
+  def __len__(self):
+    cmd = [SVNLOOK, 'history', '.']
+    output = self._command(cmd)
+    return len(output.splitlines()) - 3
+
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    if revrange is None or revrange in ((None, None), [None, None]):
-      results = []
-      for rev, prefix in self._history(self.youngest(), '/', limit):
-        results.append(self._logentry(rev, prefix))
-      return results
-    elif isinstance(revrange, (tuple, list)):
-      path_filter = None
+    if not (revrange is None or isinstance(revrange, (tuple, list))):
+      # a single revision was given
+      rev, prefix = self._maprev(revrange)
+      h = self._history(rev, prefix, 1)
+      rev = h[0].rev
+      return self._logentry(rev, prefix)
+
+    if revrange is None:
+      results = self._history(self.youngest(), path or '/', limit)
+    else:
       if revrange[1] is None:
         include = set()
         rev1 = self.youngest()
         for head in self.heads():
           if head == 'HEAD':
             continue
-          prefix1 = type(self).cleanPath(head)
-          include.update(self._mergehistory(rev1, prefix1))
+          if path:
+            p = head + '/' + path.lstrip('/')
+          else:
+            p = type(self).cleanPath(head)
+          include.update(self._mergehistory(rev1, p, limit))
       else:
         rev1, prefix1 = self._maprev(revrange[1])
-        if firstparent:
-          include = self._history(rev1, prefix1)
+        if path:
+          p = type(self).cleanPath(prefix1 + '/' + path)
         else:
-          include = self._mergehistory(rev1, prefix1)
-        if path is not None:
-          path_filter = set([(type(self).cleanPath(prefix1), 0, rev1)])
+          p = prefix1
+        if firstparent:
+          include = self._history(rev1, p)
+        else:
+          include = self._mergehistory(rev1, p, limit)
+
       if revrange[0] is None:
         results = include
       else:
         rev0, prefix0 = self._maprev(revrange[0])
         exclude = self._mergehistory(rev0, prefix0)
         results = include - exclude
+
       results = sorted(results, key=lambda x: x.rev, reverse=True)
-      if path_filter is not None:
-        path = type(self).cleanPath(path)
-        _results = []
-        for r in results:
-          changed = self._changed(r.rev)
-          merge = set()
-          for prefix, minrev, maxrev in path_filter:
-            if minrev <= r.rev <= maxrev:
-              fullpath = prefix + path
-              if fullpath in changed:
-                mergeinfo = self._mergeinfo(r.rev, prefix)
-                merge.update(mergeinfo)
-                _results.append(r)
-                continue
-          path_filter.update(merge)
-        results = _results
-      if limit is not None:
-        results = results[:limit]
-      results = map(lambda x: self._logentry(x.rev, x.path), results)
-      if merges is not None:
-        if merges:
-          results = filter(lambda x: len(x.parents) > 1, results)
-        else:
-          results = filter(lambda x: len(x.parents) <= 1, results)
-      return results
-    else:
-      rev, prefix = self._maprev(revrange)
-      h = self._history(rev, prefix, 1)
-      rev = h[0].rev
-      return self._logentry(rev, prefix)
+
+    results = map(lambda x: self._logentry(x.rev, x.path), results)
+    if merges is not None:
+      if merges:
+        results = filter(lambda x: len(x.parents) > 1, results)
+      else:
+        results = filter(lambda x: len(x.parents) <= 1, results)
+    return results
 
   def _logentry(self, rev, path, history=None):
+    import hashlib
     revstr = str(rev)
     cmd = [SVNLOOK, 'info', '.', '-r', revstr]
+    cachekey = hashlib.sha1(revstr).hexdigest()
+    entry = self._commit_cache.get(cachekey)
+    if entry:
+      return entry
     output = self._command(cmd)
     author, date, logsize, message = output.split('\n', 3)
     date = parse_isodate(date)
@@ -330,7 +362,20 @@ class SvnRepo(VCSRepo):
             parents.append(h[0].rev)
           else:
             parents.append('%s:%d' % (head, h[0].rev))
-    return CommitLogEntry(rev, parents, date, author, message)
+    entry = CommitLogEntry(rev, parents, date, author, message)
+    if cachekey not in self._commit_cache:
+      self._commit_cache[cachekey] = entry
+    return entry
+
+  def pdiff(self, rev):
+    rev, prefix = self._maprev(rev)
+    if rev == 0:
+      return ''
+    cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
+    output = self._command(cmd)
+    output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
+    output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
+    return output
 
   def diff(self, rev_a, rev_b, path=None):
     import os, shutil, tempfile
@@ -359,25 +404,27 @@ class SvnRepo(VCSRepo):
     finally:
       shutil.rmtree(tmpdir)
 
-  def _changed(self, rev):
+  def changed(self, rev):
+    rev, prefix = self._maprev(rev)
+    if rev == 0:
+      return []
     cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
     output = self._command(cmd)
     lines = output.splitlines()
     lines.reverse()
-    results = {}
+    results = []
     while lines:
       line = lines.pop()
       status = line[:3]
-      path = '/' + line[4:].lstrip('/')
+      path = line[4:].lstrip('/')
       copy = None
       if status.endswith('+'):
         line = lines.pop()
         m = changed_copy_info_rx.match(line)
         assert m
-        rev, p = m.group('rev', 'path')
-        p = '/' + path.lstrip('/')
-        copy = HistoryEntry(int(rev), p)
-      results[path] = ChangeInfo(status, copy)
+        copy = m.group('src')
+      entry = FileChangeInfo(path, status, copy)
+      results.append(entry)
     return results
 
   def _history(self, rev, path, limit=None):
@@ -460,3 +507,91 @@ class SvnRepo(VCSRepo):
           i2 += 1
 
     return None
+
+  def _blame(self, rev, path):
+    import os
+    import xml.etree.ElementTree as ET
+    url = 'file://' + os.path.abspath(self.path) + path
+    cmd = [SVN, 'blame', '--xml', '-r', rev, url]
+    output = self._command(cmd)
+    tree = ET.fromstring(output)
+    results = []
+    cat = self._cat(rev, path)
+    for entry, text in zip(tree.find('target').iter('entry'), cat.splitlines()):
+      commit = entry.find('commit')
+      rev = int(commit.attrib.get('revision'))
+      author = commit.find('author').text
+      date = commit.find('date').text
+      date = parse_isodate(date)
+      results.append(blame_tuple(rev, author, date, text))
+    return results
+
+  def blame(self, rev, path):
+    rev, prefix = self._maprev(rev)
+    path = type(self).cleanPath(prefix + path)
+    ls = self.ls(rev, path, directory=True)
+    assert len(ls) == 1
+    if ls[0].get('type') != 'f':
+      raise BadFileType(rev, path)
+    return self._blame(str(rev), path)
+
+  def dump(self, stream, progress=None, lower=None, upper=None,
+           incremental=False, deltas=False):
+    """Dump the repository to a dumpfile stream.
+
+    Arguments:
+    stream    A file stream to which the dumpfile is written
+    progress  A file stream to which progress is written
+
+    See `svnadmin help dump' for details on the other arguments.
+
+    """
+    cmd = [SVNADMIN, 'dump', '.']
+    if progress is None:
+      cmd.append('-q')
+    if lower is not None:
+      cmd.append('-r')
+      if upper is None:
+        cmd.append(str(int(lower)))
+      else:
+        cmd.append('%d:%d' % (int(lower), int(upper)))
+    if incremental:
+      cmd.append('--incremental')
+    if deltas:
+      cmd.append('--deltas')
+    p = subprocess.Popen(cmd, cwd=self.path, stdout=stream, stderr=progress)
+    p.wait()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, cmd)
+
+  def load(self, stream, progress=None, ignore_uuid=False, force_uuid=False,
+           use_pre_commit_hook=False, use_post_commit_hook=False,
+           parent_dir=None):
+    """Load a dumpfile stream into the repository.
+
+    Arguments:
+    stream    A file stream from which the dumpfile is read
+    progress  A file stream to which progress is written
+
+    See `svnadmin help load' for details on the other arguments.
+
+    """
+    cmd = [SVNADMIN, 'load', '.']
+    if progress is None:
+      cmd.append('-q')
+    if ignore_uuid:
+      cmd.append('--ignore-uuid')
+    if force_uuid:
+      cmd.append('--force-uuid')
+    if use_pre_commit_hook:
+      cmd.append('--use-pre-commit-hook')
+    if use_post_commit_hook:
+      cmd.append('--use-post-commit-hook')
+    if parent_dir:
+      cmd.extend(['--parent-dir', parent_dir])
+    p = subprocess.Popen(cmd, cwd=self.path, stdin=stream,
+                         stdout=progress, stderr=subprocess.PIPE)
+    stderr = p.stderr.read()
+    p.wait()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, cmd, stderr)

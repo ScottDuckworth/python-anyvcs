@@ -1,4 +1,4 @@
-# Copyright 2013 Scott Duckworth
+# Copyright 2013 Clemson University
 #
 # This file is part of python-anyvcs.
 #
@@ -16,22 +16,49 @@
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import json
+import os
 import re
 import subprocess
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
+from collections import namedtuple
+from .hashdict import HashDict
 
 multislash_rx = re.compile(r'//+')
-isodate_rx = re.compile(r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\s+(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{1,2})\s+(?P<tz>[+-]?\d{4})')
+isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
+
+blame_tuple = namedtuple('blame_tuple', 'rev author date line')
 
 def parse_isodate(datestr):
+  """Parse a string that loosely fits ISO 8601 formatted date-time string
+  """
   m = isodate_rx.search(datestr)
   assert m, 'unrecognized date format: ' + datestr
-  date = datetime.datetime(*[int(x) for x in m.group('year', 'month', 'day', 'hour', 'minute', 'second')])
-  tz = m.group('tz')
-  offset = datetime.timedelta(minutes=int(tz[-2:]), hours=int(tz[-4:-2]))
-  if tz[0] == '-':
-    offset = -offset
-  return date.replace(tzinfo=UTCOffset(offset))
+  year, month, day = m.group('year', 'month', 'day')
+  hour, minute, second, fraction = m.group('hour', 'minute', 'second', 'fraction')
+  tz, tzhh, tzmm = m.group('tz', 'tzhh', 'tzmm')
+  dt = datetime.datetime(int(year), int(month), int(day), int(hour))
+  if fraction is None:
+    fraction = 0
+  else:
+    fraction = float('0.' + fraction)
+  if minute is None:
+    dt = dt.replace(minute=int(60 * fraction))
+  else:
+    dt = dt.replace(minute=int(minute))
+    if second is None:
+      dt = dt.replace(second=int(60 * fraction))
+    else:
+      dt = dt.replace(second=int(second), microsecond=int(1000000 * fraction))
+  if tz is not None:
+    if tz[0] == 'Z':
+      offset = 0
+    else:
+      offset = datetime.timedelta(minutes=int(tzmm or 0), hours=int(tzhh))
+      if tz[0] == '-':
+        offset = -offset
+    dt = dt.replace(tzinfo=UTCOffset(offset))
+  return dt
 
 class UnknownVCSType(Exception):
   pass
@@ -72,6 +99,47 @@ class CommitLogEntry(object):
   def subject(self):
     return self.message.split('\n', 1)[0]
 
+  def to_json(self):
+    return json.dumps({
+      'v': 1,
+      'r': self.rev,
+      'p': self.parents,
+      'd': self.date.isoformat(),
+      'a': self.author,
+      'm': self.message,
+    })
+
+  @classmethod
+  def from_json(cls, s):
+    o = json.loads(s)
+    if o.get('v') != 1:
+      return None
+    return cls(
+      rev = o['r'],
+      parents = o['p'],
+      date = parse_isodate(o['d']),
+      author = o['a'],
+      message = o['m'],
+    )
+
+class CommitLogCache(HashDict):
+  def __getitem__(self, key):
+    value = HashDict.__getitem__(self, key)
+    value = CommitLogEntry.from_json(value)
+    if value:
+      return value
+    raise KeyError(key)
+
+  def __setitem__(self, key, value):
+    value = value.to_json()
+    HashDict.__setitem__(self, key, value)
+
+class FileChangeInfo(object):
+  def __init__(self, path, status, copy=None):
+    self.path = path
+    self.status = status
+    self.copy = copy
+
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()
 
@@ -102,6 +170,25 @@ class VCSRepo(object):
   def __init__(self, path):
     self.path = path
 
+  @abstractproperty
+  def private_path(self):
+    """Get the path to a directory which can be used to store arbitrary data
+
+    This directory should not conflict with any of the repository internals.
+    The directory should be created if it does not already exist.
+
+    """
+    raise NotImplementedError
+
+  @property
+  def _commit_cache(self):
+    try:
+      return self._commit_cache_v
+    except AttributeError:
+      commit_cache_path = os.path.join(self.private_path, 'commit-cache')
+      self._commit_cache_v = CommitLogCache(commit_cache_path)
+      return self._commit_cache_v
+
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)
     return subprocess.check_output(cmd, **kwargs)
@@ -111,6 +198,11 @@ class VCSRepo(object):
     path = path.lstrip('/')
     path = multislash_rx.sub('/', path)
     return path
+
+  @abstractmethod
+  def canonical_rev(self, rev):
+    """Get the canonical revision identifier"""
+    raise NotImplementedError
 
   @abstractmethod
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
@@ -127,7 +219,7 @@ class VCSRepo(object):
                     contents.
     report          A list or tuple of extra attributes to return that may
                     require extra processing. Recognized values are 'size',
-                    'target', and 'executable'.
+                    'target', 'executable', and 'commit'.
 
     Returns a list of dictionaries with the following keys:
     type        The type of the file: 'f' for file, 'd' for directory, 'l' for
@@ -202,6 +294,18 @@ class VCSRepo(object):
     return NotImplementedError
 
   @abstractmethod
+  def __contains__(self, rev):
+    """Test if the repository contains the specified revision
+    """
+    return NotImplementedError
+
+  @abstractmethod
+  def __len__(self):
+    """Returns the number of commits in the repository
+    """
+    return NotImplementedError
+
+  @abstractmethod
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
     """Get commit logs
@@ -231,17 +335,49 @@ class VCSRepo(object):
     raise NotImplementedError
 
   @abstractmethod
+  def changed(self, rev):
+    """Files that changed from the rev's parent(s)
+
+    Returns a list of FileChangeInfo items.
+
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def pdiff(self, rev):
+    """Diff from the rev's parent(s)
+
+    Returns a string containing the unified diff that the rev introduces with
+    a prefix of one (suitable for input to patch -p1).
+
+    """
+    raise NotImplementedError
+
+  @abstractmethod
   def diff(self, rev_a, rev_b, path=None):
     """Diff of two revisions
 
     Returns a string containing the unified diff from rev_a to rev_b with a
     prefix of one (suitable for input to patch -p1). If path is not None, only
     return the diff for that file.
+
     """
     raise NotImplementedError
 
   @abstractmethod
   def ancestor(self, rev1, rev2):
     """Find most recent common ancestor of two revisions
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def blame(self, rev, path):
+    """Blame (a.k.a. annotate, praise) a file
+
+    Returns a list of named tuples (rev, author, date, line) in file order.
+
+    Raises PathDoesNotExist if the path does not exist.
+    Raises BadFileType if the path is not a file.
+
     """
     raise NotImplementedError

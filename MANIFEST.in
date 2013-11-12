@@ -1,4 +1,6 @@
 include LICENSE
 include COPYING
 include COPYING.LESSER
+include AUTHORS
 include README.md
+include RELEASE-NOTES.txt
