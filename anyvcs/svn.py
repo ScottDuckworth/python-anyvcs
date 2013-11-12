@@ -19,6 +19,7 @@ import collections
 import fnmatch
 import re
 import subprocess
+import sys
 from common import *
 
 DIFF = 'diff'
@@ -415,8 +416,15 @@ class SvnRepo(VCSRepo):
       return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
-    output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
-    output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
+    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+      _output = ''
+      for line in output.splitlines(True):
+        line = re.sub(r'^--- ', '--- a/', line)
+        _output += re.sub(r'^\+\+\+ ', '+++ b/', line)
+      output = _output
+    else:
+      output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
+      output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
     return output
 
   def diff(self, rev_a, rev_b, path=None):
@@ -559,7 +567,12 @@ class SvnRepo(VCSRepo):
     tree = ET.fromstring(output)
     results = []
     cat = self._cat(rev, path)
-    for entry, text in zip(tree.find('target').iter('entry'), cat.splitlines()):
+    target = tree.find('target')
+    try:
+      iter = target.iter('entry')
+    except AttributeError: # added in python 2.7
+      iter = target.getiterator('entry')
+    for entry, text in zip(iter, cat.splitlines()):
       commit = entry.find('commit')
       rev = int(commit.attrib.get('revision'))
       author = commit.find('author').text

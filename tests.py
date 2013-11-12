@@ -311,7 +311,11 @@ class Commit(Action):
   def doSvn(self, test):
     xml = test.check_output(['svn', 'status', '--xml'])
     tree = ET.fromstring(xml)
-    for entry in tree.iter('entry'):
+    try:
+      iter = tree.iter('entry')
+    except AttributeError: # added in python 2.7
+      iter = tree.getiterator('entry')
+    for entry in iter:
       path = entry.attrib.get('path')
       status = entry.find('wc-status').attrib.get('item')
       if status == 'missing':
