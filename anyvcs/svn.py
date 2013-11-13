@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import with_statement
+import collections
 import fnmatch
 import re
 import subprocess
@@ -31,10 +31,7 @@ head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
 changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
 
-class HistoryEntry(object):
-  def __init__(self, rev, path):
-    self.rev = rev
-    self.path = path
+HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
 class SvnRepo(VCSRepo):
   """A Subversion repository

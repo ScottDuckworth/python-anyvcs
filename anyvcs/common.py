@@ -15,19 +15,12 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import with_statement
 import datetime
+import json
 import os
 import re
 import subprocess
-import sys
-if sys.version_info[0] == 2 and sys.version_info[1] < 6:
-  import simplejson as json
-  ABCMeta = object
-  def abstractmethod(x): return x
-else:
-  import json
-  from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod, abstractproperty
 from functools import wraps
 from .hashdict import HashDict
 
@@ -417,7 +410,7 @@ class VCSRepo(object):
   def blame(self, rev, path):
     """Blame (a.k.a. annotate, praise) a file
 
-    Returns a list of named tuples (rev, author, date, line) in file order.
+    Returns a list of BlameInfo objects in file order.
 
     Raises PathDoesNotExist if the path does not exist.
     Raises BadFileType if the path is not a file.

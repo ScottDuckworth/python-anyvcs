@@ -15,23 +15,17 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import with_statement
 import anyvcs
 import datetime
 import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 import xml.etree.ElementTree as ET
-if sys.version_info[0] == 2 and sys.version_info[1] < 6:
-  ABCMeta = object
-  def abstractmethod(x): return x
-else:
-  from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod
 from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
 
 keep_test_dir = False
