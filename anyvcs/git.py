@@ -48,7 +48,6 @@ diff_tree_rx = re.compile(r"""
 """, re.VERBOSE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
-blame_rx = re.compile(r'^(?P<rev>[0-9a-fA-F]{40})\t\((?P<author>[^\t]*)\t(?P<date>[^\t]+)\t\d+\)(?P<text>.*)$')
 
 class GitRepo(VCSRepo):
   """A git repository
@@ -171,7 +170,8 @@ class GitRepo(VCSRepo):
           entry.commit = self._object_cache[objid]
         except KeyError:
           cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', name]
-          entry.commit = self._object_cache[objid] = self._command(cmd)
+          commit = str(self._command(cmd))
+          entry.commit = self._object_cache[objid] = commit
       results.append(entry)
 
     return results
@@ -301,9 +301,9 @@ class GitRepo(VCSRepo):
     for m in diff_tree_rx.finditer(output):
       status, src_path, dst_path = m.group('status', 'src_path', 'dst_path')
       if dst_path:
-        entry = FileChangeInfo(dst_path, status, src_path)
+        entry = FileChangeInfo(dst_path, str(status), src_path)
       else:
-        entry = FileChangeInfo(src_path, status)
+        entry = FileChangeInfo(src_path, str(status))
       results.append(entry)
     return results
 
@@ -330,15 +330,26 @@ class GitRepo(VCSRepo):
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
   def _blame(self, rev, path):
-    cmd = [GIT, 'blame', '--root', '-lc', rev, '--', path]
+    cmd = [GIT, 'blame', '--root', '-p', rev, '--', path]
     output = self._command(cmd)
+    rev = None
+    revinfo = {}
     results = []
     for line in output.splitlines():
-      m = blame_rx.match(line)
-      assert m, 'unexpected output: ' + line
-      rev, author, date, text = m.group('rev', 'author', 'date', 'text')
-      date = parse_isodate(date)
-      results.append(BlameInfo(rev, author, date, text))
+      if line.startswith('\t'):
+        ri = revinfo[rev]
+        author = ri['author'] + ' ' + ri['author-mail']
+        ts = int(ri['author-time'])
+        tz = UTCOffset(str(ri['author-tz']))
+        date = datetime.datetime.fromtimestamp(ts, tz)
+        entry = BlameInfo(rev, author, date, line[1:])
+        results.append(entry)
+      else:
+        k, v = line.split(None, 1)
+        if rev_rx.match(k):
+          rev = k
+        else:
+          revinfo.setdefault(rev, {})[k] = v
     return results
 
   def blame(self, rev, path):

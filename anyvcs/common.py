@@ -26,6 +26,7 @@ from .hashdict import HashDict
 
 multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
+tz_rx = re.compile(r'^(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?))$')
 
 def parse_isodate(datestr):
   """Parse a string that loosely fits ISO 8601 formatted date-time string
@@ -173,6 +174,14 @@ class UTCOffset(datetime.tzinfo):
   def __init__(self, offset, name=None):
     if isinstance(offset, datetime.timedelta):
       self.offset = offset
+    elif isinstance(offset, str):
+      m = tz_rx.match(offset)
+      assert m
+      tz, tzhh, tzmm = m.group('tz', 'tzhh', 'tzmm')
+      offset = datetime.timedelta(minutes=int(tzmm or 0), hours=int(tzhh))
+      if tz[0] == '-':
+        offset = -offset
+      self.offset = offset
     else:
       self.offset = datetime.timedelta(minutes=offset)
     if name is not None:
@@ -220,7 +229,8 @@ class VCSRepo(object):
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)
     try:
-      return subprocess.check_output(cmd, **kwargs).decode()
+      output = subprocess.check_output(cmd, **kwargs)
+      return output.decode()
     except AttributeError: # subprocess.check_output added in python 2.7
       kwargs.setdefault('stdout', subprocess.PIPE)
       p = subprocess.Popen(cmd, **kwargs)

@@ -17,6 +17,7 @@
 
 import anyvcs
 import datetime
+import getpass
 import os
 import re
 import shutil
@@ -907,15 +908,6 @@ class BasicTest(object):
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
 
-  def test_blame(self):
-    result = self.repo.blame(self.main_branch, 'a')
-    self.assertIsInstance(result, list)
-    self.assertEqual(1, len(result))
-    self.assertEqual(self.rev1, result[0].rev)
-    self.assertIsInstance(result[0].author, str)
-    self.assertIsInstance(result[0].date, datetime.datetime)
-    self.assertEqual('Pisgah', result[0].line)
-
 class GitLikeBasicTest(BasicTest):
   def test_log_all(self):
     result = self.repo.log()
@@ -932,6 +924,15 @@ class GitLikeBasicTest(BasicTest):
     for x in result:
       self.assertIsInstance(x.status, str)
       self.assertLessEqual(1, len(x.status))
+
+  def test_blame(self):
+    result = self.repo.blame(self.main_branch, 'a')
+    self.assertIsInstance(result, list)
+    self.assertEqual(1, len(result))
+    self.assertEqual(self.rev1, result[0].rev)
+    self.assertEqual('Test User <me@example.com>', result[0].author)
+    self.assertIsInstance(result[0].date, datetime.datetime)
+    self.assertEqual('Pisgah', result[0].line)
 
 class GitBasicTest(GitTest, GitLikeBasicTest):
   def test_branches(self):
@@ -1008,6 +1009,15 @@ class SvnBasicTest(SvnTest, BasicTest):
       self.assertIsInstance(x.status, str)
       self.assertLessEqual(1, len(x.status))
 
+  def test_blame(self):
+    result = self.repo.blame(self.main_branch, 'a')
+    self.assertIsInstance(result, list)
+    self.assertEqual(1, len(result))
+    self.assertEqual(self.rev1, result[0].rev)
+    self.assertEqual(getpass.getuser(), result[0].author)
+    self.assertIsInstance(result[0].date, datetime.datetime)
+    self.assertEqual('Pisgah', result[0].line)
+
 ### TEST CASE: UnrelatedBranchTest ###
 
 class UnrelatedBranchTest(object):
@@ -1024,7 +1034,7 @@ class UnrelatedBranchTest(object):
 
   def test_branches(self):
     result = self.repo.branches()
-    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
+    correct = list(map(self.encode_branch, [self.main_branch, 'branch1']))
     self.assertEqual(sorted(correct), sorted(result))
 
   def test_ancestor(self):
@@ -1051,7 +1061,7 @@ class HgUnrelatedBranchTest(HgTest, UnrelatedBranchTest): pass
 class SvnUnrelatedBranchTest(SvnTest, UnrelatedBranchTest):
   def test_branches(self):
     result = self.repo.branches()
-    correct = ['HEAD'] + map(self.encode_branch, [self.main_branch, 'branch1'])
+    correct = ['HEAD'] + list(map(self.encode_branch, [self.main_branch, 'branch1']))
     self.assertEqual(sorted(correct), sorted(result))
 
 
@@ -1203,7 +1213,7 @@ class BranchTestStep3(object):
 class GitLikeBranchTestStep3(BranchTestStep3):
   def test_branches(self):
     result = self.repo.branches()
-    correct = map(self.encode_branch, [self.main_branch, 'branch1'])
+    correct = list(map(self.encode_branch, [self.main_branch, 'branch1']))
     self.assertEqual(sorted(correct), sorted(result))
 
   def test_log_main(self):
@@ -1244,7 +1254,7 @@ class HgBranchTestStep3(HgTest, GitLikeBranchTestStep3): pass
 class SvnBranchTestStep3(SvnTest, BranchTestStep3):
   def test_branches(self):
     result = self.repo.branches()
-    correct = ['HEAD'] + map(self.encode_branch, [self.main_branch, 'branch1'])
+    correct = ['HEAD'] + list(map(self.encode_branch, [self.main_branch, 'branch1']))
     self.assertEqual(sorted(correct), sorted(result))
 
   def test_log_main(self):
@@ -1260,24 +1270,24 @@ class SvnBranchTestStep3(SvnTest, BranchTestStep3):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(4, -1, -1)
+    correct = list(range(4, -1, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
     result = [x.rev for x in self.repo.log(revrange=(None, self.main_branch))]
-    correct = range(2, 0, -1)
+    correct = list(range(2, 0, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_branch1(self):
     branch1 = self.encode_branch('branch1')
     result = [x.rev for x in self.repo.log(revrange=(None, branch1))]
-    correct = range(4, 0, -1)
+    correct = list(range(4, 0, -1))
     self.assertEqual(correct, result)
 
   def test_log_main_branch1(self):
     branch1 = self.encode_branch('branch1')
     result = [x.rev for x in self.repo.log(revrange=(self.main_branch, branch1))]
-    correct = range(4, 2, -1)
+    correct = list(range(4, 2, -1))
     self.assertEqual(correct, result)
 
 ### TEST CASE: BranchTestStep7 ###
@@ -1412,8 +1422,8 @@ class BranchTestStep7(object):
 class GitLikeBranchTestStep7(BranchTestStep7):
   def test_branches(self):
     result = self.repo.branches()
-    correct = map(self.encode_branch,
-                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
+    correct = list(map(self.encode_branch,
+                  [self.main_branch, 'branch1', 'branch1a', 'branch2']))
     self.assertEqual(sorted(correct), sorted(result))
 
   def test_log_main(self):
@@ -1490,8 +1500,8 @@ class HgBranchTestStep7(HgTest, GitLikeBranchTestStep7): pass
 class SvnBranchTestStep7(SvnTest, BranchTestStep7):
   def test_branches(self):
     result = self.repo.branches()
-    correct = ['HEAD'] + map(self.encode_branch,
-                  [self.main_branch, 'branch1', 'branch1a', 'branch2'])
+    correct = ['HEAD'] + list(map(self.encode_branch,
+                  [self.main_branch, 'branch1', 'branch1a', 'branch2']))
     self.assertEqual(sorted(correct), sorted(result))
 
   def test_log_main(self):
@@ -1519,7 +1529,7 @@ class SvnBranchTestStep7(SvnTest, BranchTestStep7):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(10, -1, -1)
+    correct = list(range(10, -1, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
@@ -1660,7 +1670,7 @@ class SvnBranchTestStep9(SvnTest, BranchTestStep9):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(12, -1, -1)
+    correct = list(range(12, -1, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
@@ -1789,7 +1799,7 @@ class SvnBranchTestStep11(SvnTest, BranchTestStep11):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(14, -1, -1)
+    correct = list(range(14, -1, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
@@ -1900,12 +1910,12 @@ class SvnBranchTestStep13(SvnTest, BranchTestStep13):
 
   def test_log_all(self):
     result = [x.rev for x in self.repo.log()]
-    correct = range(18, -1, -1)
+    correct = list(range(18, -1, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main(self):
     result = [x.rev for x in self.repo.log(revrange=(None, self.main_branch))]
-    correct = range(15, 0, -1)
+    correct = list(range(15, 0, -1))
     self.assertEqual(correct, result)
 
   def test_log_None_main_path_b(self):
