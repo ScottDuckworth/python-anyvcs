@@ -5,7 +5,7 @@ python:
   - "3.2"
 install:
   - pip install .
-  - pip install unittest2
+  - "if [ `python3 --version 2>&1 | cut -f2 -d' ' | cut -f1 -d.` -lt 3 ]; then pip install unittest2; fi"
 before_script:
   - git --version
   - hg --version --quiet
