@@ -21,15 +21,16 @@ import json
 import os
 import re
 import subprocess
-from abc import ABCMeta, abstractmethod, abstractproperty
-from collections import namedtuple
+if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+  ABCMeta = object
+  def abstractmethod(x): return x
+else:
+  from abc import ABCMeta, abstractmethod, abstractproperty
 from functools import wraps
 from .hashdict import HashDict
 
 multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
-
-blame_tuple = namedtuple('blame_tuple', 'rev author date line')
 
 def parse_isodate(datestr):
   """Parse a string that loosely fits ISO 8601 formatted date-time string
@@ -163,6 +164,13 @@ class FileChangeInfo(object):
     self.path = path
     self.status = status
     self.copy = copy
+
+class BlameInfo(object):
+  def __init__(self, rev, author, date, line):
+    self.rev = rev
+    self.author = author
+    self.date = date
+    self.line = line
 
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()

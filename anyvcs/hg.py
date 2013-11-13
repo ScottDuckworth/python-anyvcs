@@ -428,7 +428,7 @@ class HgRepo(VCSRepo):
         rev, date = self._command(cmd).split('\n', 1)
         date = parse_hgdate(date)
         revs[rev] = rev, date
-      results.append(blame_tuple(rev, author, date, text))
+      results.append(BlameInfo(rev, author, date, text))
     return results
 
   def blame(self, rev, path):

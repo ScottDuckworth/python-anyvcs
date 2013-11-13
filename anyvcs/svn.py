@@ -16,7 +16,6 @@
 # along with python-anyvcs.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import with_statement
-import collections
 import fnmatch
 import re
 import subprocess
@@ -32,7 +31,10 @@ head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
 changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
 
-HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
+class HistoryEntry(object):
+  def __init__(self, rev, path):
+    self.rev = rev
+    self.path = path
 
 class SvnRepo(VCSRepo):
   """A Subversion repository
@@ -579,7 +581,7 @@ class SvnRepo(VCSRepo):
       author = commit.find('author').text
       date = commit.find('date').text
       date = parse_isodate(date)
-      results.append(blame_tuple(rev, author, date, text))
+      results.append(BlameInfo(rev, author, date, text))
     return results
 
   def blame(self, rev, path):

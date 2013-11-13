@@ -338,7 +338,7 @@ class GitRepo(VCSRepo):
       assert m, 'unexpected output: ' + line
       rev, author, date, text = m.group('rev', 'author', 'date', 'text')
       date = parse_isodate(date)
-      results.append(blame_tuple(rev, author, date, text))
+      results.append(BlameInfo(rev, author, date, text))
     return results
 
   def blame(self, rev, path):
