@@ -17,15 +17,16 @@
 
 from __future__ import with_statement
 import datetime
-import json
 import os
 import re
 import subprocess
 import sys
 if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+  import simplejson as json
   ABCMeta = object
   def abstractmethod(x): return x
 else:
+  import json
   from abc import ABCMeta, abstractmethod, abstractproperty
 from functools import wraps
 from .hashdict import HashDict
