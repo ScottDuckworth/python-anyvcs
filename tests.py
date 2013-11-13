@@ -21,9 +21,13 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-import unittest
+if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+  import unittest2 as unittest
+else:
+  import unittest
 import xml.etree.ElementTree as ET
 from abc import ABCMeta, abstractmethod
 from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
@@ -126,28 +130,6 @@ class VCSTest(unittest.TestCase):
   @classmethod
   def branch_prefix(cls, branch):
     return ''
-
-  def setUp(self):
-    try:
-      self.dir
-    except AttributeError:
-      self.setUpClass()
-
-  if not hasattr(unittest.TestCase, 'assertIsInstance'):
-    def assertIsInstance(self, obj, cls, msg=None):
-      self.assertTrue(isinstance(obj, cls), msg)
-
-  if not hasattr(unittest.TestCase, 'assertIn'):
-    def assertIn(self, member, container, msg=None):
-      self.assertTrue(member in container, msg)
-
-  if not hasattr(unittest.TestCase, 'assertNotIn'):
-    def assertNotIn(self, member, container, msg=None):
-      self.assertTrue(member not in container, msg)
-
-  if not hasattr(unittest.TestCase, 'assertLessEqual'):
-    def assertLessEqual(self, a, b, msg=None):
-      self.assertTrue(a <= b, msg)
 
 class GitTest(VCSTest):
   @classmethod

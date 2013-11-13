@@ -34,3 +34,13 @@ Example usage:
      {'name': 'anyvcs', 'path': 'anyvcs', 'type': 'd'},
      {'name': 'setup.py', 'path': 'setup.py', 'type': 'f'},
      {'name': 'tests.py', 'path': 'tests.py', 'type': 'f'}]
+
+Compatibility
+-------------
+
+python-anyvcs should work with the following software versions:
+
+  * Python: 2.6, 2.7
+  * Git: 1.7.0 or later
+  * Mercurial: 1.6.1 or later
+  * Subversion: 1.5 or later

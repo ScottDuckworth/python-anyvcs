@@ -1,6 +1,12 @@
 Release Notes for python-anyvcs
 ===============================
 
+1.2.1 (2013-11-13)
+------------------
+
+* Add support for python 2.6
+* Add Travis-CI testing
+
 1.2.0 (2013-11-12)
 ------------------
 
