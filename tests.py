@@ -21,22 +21,20 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-import unittest
+if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+  import unittest2 as unittest
+else:
+  import unittest
 import xml.etree.ElementTree as ET
 from abc import ABCMeta, abstractmethod
 from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
 
-debug_to_stdout = False
 keep_test_dir = False
 
-if debug_to_stdout:
-  import sys
-  logfile = sys.stdout
-else:
-  logfile = open(os.devnull, 'w')
-
+logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
 def check_call(args, **kwargs):
@@ -48,7 +46,15 @@ def check_call(args, **kwargs):
 def check_output(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stderr', logfile)
-  return subprocess.check_output(args, **kwargs)
+  try:
+    return subprocess.check_output(args, **kwargs)
+  except AttributeError: # subprocess.check_output added in python 2.7
+    kwargs.setdefault('stdout', subprocess.PIPE)
+    p = subprocess.Popen(args, **kwargs)
+    stdout, stderr = p.communicate()
+    if p.returncode != 0:
+      raise subprocess.CalledProcessError(p.returncode, args)
+    return stdout
 
 def normalize_ls(x):
   return sorted(x, key=lambda y: y.get('name'))
@@ -72,7 +78,7 @@ class VCSTest(unittest.TestCase):
   def setUpClass(cls):
     cls.dir = tempfile.mkdtemp(prefix='anyvcs-test.')
     if keep_test_dir:
-      print cls.dir
+      print(cls.dir)
     cls.main_path = os.path.join(cls.dir, 'main')
     cls.working_path = os.path.join(cls.dir, 'work')
     cls.working_head = None
@@ -130,6 +136,8 @@ class GitTest(VCSTest):
   def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'git')
     check_call(['git', 'clone', cls.main_path, cls.working_path])
+    cls.check_call(['git', 'config', 'user.email', 'me@example.com'])
+    cls.check_call(['git', 'config', 'user.name', 'Test User'])
     cls.main_branch = 'master'
     cls.working_head = 'master'
     for action in cls.setUpWorkingCopy(cls.working_path):
@@ -158,6 +166,8 @@ class HgTest(VCSTest):
   def setUpRepos(cls):
     cls.repo = anyvcs.create(cls.main_path, 'hg')
     check_call(['hg', 'clone', cls.main_path, cls.working_path])
+    with open(os.path.join(cls.working_path, '.hg', 'hgrc'), 'a') as hgrc:
+      hgrc.write('[ui]\nusername = Test User <me@example.com>\n')
     cls.main_branch = 'default'
     cls.working_head = 'default'
     for action in cls.setUpWorkingCopy(cls.working_path):
@@ -283,7 +293,11 @@ class Commit(Action):
   def doSvn(self, test):
     xml = test.check_output(['svn', 'status', '--xml'])
     tree = ET.fromstring(xml)
-    for entry in tree.iter('entry'):
+    try:
+      iter = tree.iter('entry')
+    except AttributeError: # added in python 2.7
+      iter = tree.getiterator('entry')
+    for entry in iter:
       path = entry.attrib.get('path')
       status = entry.find('wc-status').attrib.get('item')
       if status == 'missing':
@@ -565,13 +579,13 @@ class BasicTest(object):
   def setUpWorkingCopy(cls, working_path):
     with open(os.path.join(working_path, 'a'), 'w') as f:
       f.write('Pisgah')
-    os.chmod(os.path.join(working_path, 'a'), 0644)
+    os.chmod(os.path.join(working_path, 'a'), 0o644)
     os.symlink('a', os.path.join(working_path, 'b'))
     os.mkdir(os.path.join(working_path, 'c'))
     os.mkdir(os.path.join(working_path, 'c', 'd'))
     with open(os.path.join(working_path, 'c', 'd', 'e'), 'w') as f:
       f.write('Denali')
-    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
+    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0o755)
     os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
     yield Commit('commit 1\n\nsetup working copy')
     cls.rev1 = cls.getAbsoluteRev()

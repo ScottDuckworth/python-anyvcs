@@ -19,7 +19,7 @@ import os
 import re
 import stat
 import subprocess
-from common import *
+from .common import *
 from .hashdict import HashDict
 
 GIT = 'git'
@@ -51,14 +51,27 @@ rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
 blame_rx = re.compile(r'^(?P<rev>[0-9a-fA-F]{40})\t\((?P<author>[^\t]*)\t(?P<date>[^\t]+)\t\d+\)(?P<text>.*)$')
 
 class GitRepo(VCSRepo):
+  """A git repository
+
+  Valid revisions are anything that git considers as a revision.
+
+  """
+
   @classmethod
   def create(cls, path):
+    """Create a new bare repository"""
     cmd = [GIT, 'init', '--quiet', '--bare', path]
     subprocess.check_call(cmd)
     return cls(path)
 
   @property
   def private_path(self):
+    """Get the path to a directory which can be used to store arbitrary data
+
+    This directory should not conflict with any of the repository internals.
+    The directory should be created if it does not already exist.
+
+    """
     path = os.path.join(self.path, '.private')
     try:
       os.mkdir(path)
@@ -324,7 +337,7 @@ class GitRepo(VCSRepo):
       assert m, 'unexpected output: ' + line
       rev, author, date, text = m.group('rev', 'author', 'date', 'text')
       date = parse_isodate(date)
-      results.append(blame_tuple(rev, author, date, text))
+      results.append(BlameInfo(rev, author, date, text))
     return results
 
   def blame(self, rev, path):

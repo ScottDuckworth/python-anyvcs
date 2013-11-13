@@ -21,13 +21,11 @@ import os
 import re
 import subprocess
 from abc import ABCMeta, abstractmethod, abstractproperty
-from collections import namedtuple
+from functools import wraps
 from .hashdict import HashDict
 
 multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
-
-blame_tuple = namedtuple('blame_tuple', 'rev author date line')
 
 def parse_isodate(datestr):
   """Parse a string that loosely fits ISO 8601 formatted date-time string
@@ -59,6 +57,28 @@ def parse_isodate(datestr):
         offset = -offset
     dt = dt.replace(tzinfo=UTCOffset(offset))
   return dt
+
+class ABCMetaDocStringInheritor(ABCMeta):
+  '''A variation on
+  http://groups.google.com/group/comp.lang.python/msg/26f7b4fcb4d66c95
+  by Paul McGuire
+  '''
+  def __new__(meta, name, bases, clsdict):
+    if not('__doc__' in clsdict and clsdict['__doc__']):
+      for mro_cls in (mro_cls for base in bases for mro_cls in base.mro()):
+        doc = mro_cls.__doc__
+        if doc:
+          clsdict['__doc__'] = doc
+          break
+    for attr, attribute in clsdict.items():
+      if not attribute.__doc__:
+        for mro_cls in (mro_cls for base in bases for mro_cls in base.mro()
+                        if hasattr(mro_cls, attr)):
+          doc=getattr(getattr(mro_cls, attr), '__doc__')
+          if doc:
+            attribute.__doc__ = doc
+            break
+    return ABCMeta.__new__(meta, name, bases, clsdict)
 
 class UnknownVCSType(Exception):
   pass
@@ -140,6 +160,13 @@ class FileChangeInfo(object):
     self.status = status
     self.copy = copy
 
+class BlameInfo(object):
+  def __init__(self, rev, author, date, line):
+    self.rev = rev
+    self.author = author
+    self.date = date
+    self.line = line
+
 class UTCOffset(datetime.tzinfo):
   ZERO = datetime.timedelta()
 
@@ -165,9 +192,10 @@ class UTCOffset(datetime.tzinfo):
     return self.name
 
 class VCSRepo(object):
-  __metaclass__ = ABCMeta
+  __metaclass__ = ABCMetaDocStringInheritor
 
   def __init__(self, path):
+    """Open an existing repository"""
     self.path = path
 
   @abstractproperty
@@ -191,7 +219,15 @@ class VCSRepo(object):
 
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)
-    return subprocess.check_output(cmd, **kwargs)
+    try:
+      return subprocess.check_output(cmd, **kwargs)
+    except AttributeError: # subprocess.check_output added in python 2.7
+      kwargs.setdefault('stdout', subprocess.PIPE)
+      p = subprocess.Popen(cmd, **kwargs)
+      stdout, stderr = p.communicate()
+      if p.returncode != 0:
+        raise subprocess.CalledProcessError(p.returncode, cmd)
+      return stdout
 
   @classmethod
   def cleanPath(cls, path):
@@ -374,7 +410,7 @@ class VCSRepo(object):
   def blame(self, rev, path):
     """Blame (a.k.a. annotate, praise) a file
 
-    Returns a list of named tuples (rev, author, date, line) in file order.
+    Returns a list of BlameInfo objects in file order.
 
     Raises PathDoesNotExist if the path does not exist.
     Raises BadFileType if the path is not a file.

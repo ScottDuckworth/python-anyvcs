@@ -19,7 +19,8 @@ import collections
 import fnmatch
 import re
 import subprocess
-from common import *
+import sys
+from .common import *
 
 DIFF = 'diff'
 SVN = 'svn'
@@ -33,8 +34,42 @@ changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
 class SvnRepo(VCSRepo):
+  """A Subversion repository
+
+  Unless otherwise specified, valid revisions are:
+  - an integer (ex: 194)
+  - an integer as a string (ex: "194")
+  - a branch or tag name (ex: "HEAD", "trunk", "branches/branch1")
+  - a branch or tag name at a specific revision (ex: "trunk:194")
+
+  Revisions have the following meanings:
+  - HEAD always maps to the root of the repository (/)
+  - Anything else (ex: "trunk", "branches/branch1") maps to the corresponding
+    path in the repository
+  - The youngest revision is assumed unless a revision is specified
+
+  For example, the following code will list the contents of the directory
+  branches/branch1/src from revision 194:
+
+      repo = SvnRepo(path)
+      repo.ls('branches/branch1:194', 'src')
+
+  Branches and tags are detected in branches() and tags() by looking at the
+  paths specified in repo.branch_glob and repo.tag_glob.  The default values
+  for these variables will detect the following repository layout:
+
+      /trunk - the main development branch
+      /branches/* - branches
+      /tags/* - tags
+
+  If a repository does not fit this layout, everything other than branch and
+  tag detection will work as expected.
+
+  """
+
   @classmethod
   def create(cls, path):
+    """Create a new repository"""
     cmd = [SVNADMIN, 'create', path]
     subprocess.check_call(cmd)
     return cls(path)
@@ -53,6 +88,12 @@ class SvnRepo(VCSRepo):
 
   @property
   def private_path(self):
+    """Get the path to a directory which can be used to store arbitrary data
+
+    This directory should not conflict with any of the repository internals.
+    The directory should be created if it does not already exist.
+
+    """
     import os
     path = os.path.join(self.path, '.private')
     try:
@@ -69,6 +110,7 @@ class SvnRepo(VCSRepo):
     return [x.strip() for x in output.splitlines()]
 
   def proplist(self, rev, path=None):
+    """List Subversion properties of the path"""
     rev, prefix = self._maprev(rev)
     if path is None:
       return self._proplist(str(rev), None)
@@ -81,6 +123,7 @@ class SvnRepo(VCSRepo):
     return self._command(cmd)
 
   def propget(self, prop, rev, path=None):
+    """Get Subversion property value of the path"""
     rev, prefix = self._maprev(rev)
     if path is None:
       return self._propget(prop, str(rev), None)
@@ -373,8 +416,15 @@ class SvnRepo(VCSRepo):
       return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
-    output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
-    output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
+    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+      _output = ''
+      for line in output.splitlines(True):
+        line = re.sub(r'^--- ', '--- a/', line)
+        _output += re.sub(r'^\+\+\+ ', '+++ b/', line)
+      output = _output
+    else:
+      output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
+      output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
     return output
 
   def diff(self, rev_a, rev_b, path=None):
@@ -517,13 +567,18 @@ class SvnRepo(VCSRepo):
     tree = ET.fromstring(output)
     results = []
     cat = self._cat(rev, path)
-    for entry, text in zip(tree.find('target').iter('entry'), cat.splitlines()):
+    target = tree.find('target')
+    try:
+      iter = target.iter('entry')
+    except AttributeError: # added in python 2.7
+      iter = target.getiterator('entry')
+    for entry, text in zip(iter, cat.splitlines()):
       commit = entry.find('commit')
       rev = int(commit.attrib.get('revision'))
       author = commit.find('author').text
       date = commit.find('date').text
       date = parse_isodate(date)
-      results.append(blame_tuple(rev, author, date, text))
+      results.append(BlameInfo(rev, author, date, text))
     return results
 
   def blame(self, rev, path):
@@ -542,6 +597,8 @@ class SvnRepo(VCSRepo):
     Arguments:
     stream    A file stream to which the dumpfile is written
     progress  A file stream to which progress is written
+    lower     Must be a numeric version number
+    upper     Must be a numeric version number
 
     See `svnadmin help dump' for details on the other arguments.
 
