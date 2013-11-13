@@ -22,11 +22,16 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 import xml.etree.ElementTree as ET
-from abc import ABCMeta, abstractmethod
+if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+  ABCMeta = object
+  def abstractmethod(x): return x
+else:
+  from abc import ABCMeta, abstractmethod
 from anyvcs.common import CommitLogEntry, UTCOffset, UnknownVCSType, PathDoesNotExist, BadFileType
 
 keep_test_dir = False
