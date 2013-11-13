@@ -25,10 +25,10 @@ class HashDict(collections.MutableMapping):
   on-disk and is multi-process safe.
   """
 
-  def __init__(self, path, mode=0666):
+  def __init__(self, path, mode=0o666):
     self.path = path
     self.mode = mode
-    self.dirmode = mode | (mode >> 1) & 0111 | (mode >> 2) & 0111
+    self.dirmode = mode | (mode >> 1) & 0o111 | (mode >> 2) & 0o111
     try:
       os.mkdir(path, self.dirmode)
     except OSError as e:

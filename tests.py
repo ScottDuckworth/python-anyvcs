@@ -74,7 +74,7 @@ class VCSTest(unittest.TestCase):
   def setUpClass(cls):
     cls.dir = tempfile.mkdtemp(prefix='anyvcs-test.')
     if keep_test_dir:
-      print cls.dir
+      print(cls.dir)
     cls.main_path = os.path.join(cls.dir, 'main')
     cls.working_path = os.path.join(cls.dir, 'work')
     cls.working_head = None
@@ -597,13 +597,13 @@ class BasicTest(object):
   def setUpWorkingCopy(cls, working_path):
     with open(os.path.join(working_path, 'a'), 'w') as f:
       f.write('Pisgah')
-    os.chmod(os.path.join(working_path, 'a'), 0644)
+    os.chmod(os.path.join(working_path, 'a'), 0o644)
     os.symlink('a', os.path.join(working_path, 'b'))
     os.mkdir(os.path.join(working_path, 'c'))
     os.mkdir(os.path.join(working_path, 'c', 'd'))
     with open(os.path.join(working_path, 'c', 'd', 'e'), 'w') as f:
       f.write('Denali')
-    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0755)
+    os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0o755)
     os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
     yield Commit('commit 1\n\nsetup working copy')
     cls.rev1 = cls.getAbsoluteRev()

@@ -20,7 +20,7 @@ import fnmatch
 import re
 import subprocess
 import sys
-from common import *
+from .common import *
 
 DIFF = 'diff'
 SVN = 'svn'

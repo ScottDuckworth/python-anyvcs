@@ -19,7 +19,7 @@ import os
 import re
 import stat
 import subprocess
-from common import *
+from .common import *
 from .hashdict import HashDict
 
 GIT = 'git'

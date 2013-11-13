@@ -19,7 +19,7 @@ import datetime
 import os
 import re
 import subprocess
-from common import *
+from .common import *
 
 HG = 'hg'
 
