@@ -116,7 +116,8 @@ class GitRepo(VCSRepo):
         return [entry]
     else:
       cmd = [GIT, 'ls-tree', '-z', rev, '--', path.rstrip('/')]
-      output = self._command(cmd).rstrip('\0')
+      output = self._command(cmd)
+      output = output.rstrip('\0')
       m = ls_tree_rx.match(output)
       if not m:
         raise PathDoesNotExist(rev, path)
@@ -222,7 +223,7 @@ class GitRepo(VCSRepo):
     p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
-    return not rev_rx.match(stdout)
+    return not rev_rx.match(stdout.decode())
 
   def __contains__(self, rev):
     cmd = [GIT, 'rev-list', '-n', '1', rev]
@@ -322,7 +323,7 @@ class GitRepo(VCSRepo):
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode == 0:
-      return stdout.rstrip()
+      return stdout.decode().rstrip()
     elif p.returncode == 1:
       return None
     else:

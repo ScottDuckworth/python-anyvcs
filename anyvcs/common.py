@@ -220,14 +220,14 @@ class VCSRepo(object):
   def _command(self, cmd, input=None, **kwargs):
     kwargs.setdefault('cwd', self.path)
     try:
-      return subprocess.check_output(cmd, **kwargs)
+      return subprocess.check_output(cmd, **kwargs).decode()
     except AttributeError: # subprocess.check_output added in python 2.7
       kwargs.setdefault('stdout', subprocess.PIPE)
       p = subprocess.Popen(cmd, **kwargs)
       stdout, stderr = p.communicate()
       if p.returncode != 0:
         raise subprocess.CalledProcessError(p.returncode, cmd)
-      return stdout
+      return stdout.decode()
 
   @classmethod
   def cleanPath(cls, path):

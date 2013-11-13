@@ -47,7 +47,7 @@ def check_output(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stderr', logfile)
   try:
-    return subprocess.check_output(args, **kwargs)
+    return subprocess.check_output(args, **kwargs).decode()
   except AttributeError: # subprocess.check_output added in python 2.7
     kwargs.setdefault('stdout', subprocess.PIPE)
     p = subprocess.Popen(args, **kwargs)
@@ -157,7 +157,7 @@ class GitTest(VCSTest):
     data = check_output(cmd1, cwd=cls.main_path)
     cmd2 = ['tar', '-x', '-C', path]
     p = subprocess.Popen(cmd2, stdin=subprocess.PIPE)
-    p.communicate(data)
+    p.communicate(data.encode())
     if p.returncode != 0:
       raise subprocess.CalledProcessError(p.returncode, cmd2)
 
@@ -872,7 +872,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.rev1)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff)
+    p.communicate(pdiff.encode())
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -894,7 +894,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.main_branch)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff)
+    p.communicate(pdiff.encode())
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -1169,7 +1169,7 @@ class BranchTestStep3(object):
     for action in setup_branch_test(cls, 3):
       yield action
     cls.revrev = {}
-    for k in sorted(cls.rev.iterkeys()):
+    for k in sorted(cls.rev):
       cls.revrev.setdefault(cls.rev[k], k)
 
   def test_ancestor_main_branch1(self):
@@ -1288,7 +1288,7 @@ class BranchTestStep7(object):
     for action in setup_branch_test(cls, 7):
       yield action
     cls.revrev = {}
-    for k in sorted(cls.rev.iterkeys()):
+    for k in sorted(cls.rev):
       cls.revrev.setdefault(cls.rev[k], k)
 
   def test_ancestor_main_branch1(self):
@@ -1392,7 +1392,7 @@ class BranchTestStep7(object):
     self.export(branch1a, path_b)
     diff = self.repo.diff(self.main_branch, branch1a)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(diff)
+    p.communicate(diff.encode())
     self.assertEqual(0, p.returncode)
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
@@ -1571,7 +1571,7 @@ class BranchTestStep9(object):
     for action in setup_branch_test(cls, 9):
       yield action
     cls.revrev = {}
-    for k in sorted(cls.rev.iterkeys()):
+    for k in sorted(cls.rev):
       cls.revrev.setdefault(cls.rev[k], k)
 
   def test_ancestor_main_branch2(self):
@@ -1688,7 +1688,7 @@ class BranchTestStep11(object):
     for action in setup_branch_test(cls, 11):
       yield action
     cls.revrev = {}
-    for k in sorted(cls.rev.iterkeys()):
+    for k in sorted(cls.rev):
       cls.revrev.setdefault(cls.rev[k], k)
 
   def test_ancestor_main_branch1(self):
@@ -1835,7 +1835,7 @@ class BranchTestStep13(object):
     for action in setup_branch_test(cls, 13):
       yield action
     cls.revrev = {}
-    for k in sorted(cls.rev.iterkeys()):
+    for k in sorted(cls.rev):
       cls.revrev.setdefault(cls.rev[k], k)
 
   def test_main(self):
