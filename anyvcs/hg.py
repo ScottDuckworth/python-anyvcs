@@ -90,7 +90,7 @@ class HgRepo(VCSRepo):
   def _revnum(self, rev):
     if isinstance(rev, int):
       return rev
-    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+    elif isinstance(rev, str) and rev.isdigit():
       return int(rev)
     else:
       cmd = [HG, 'log', '--template={rev}', '-r', str(rev)]
@@ -128,7 +128,7 @@ class HgRepo(VCSRepo):
         if '/' in entry_name:
           p = parent_dirs(entry_name)
           if not recursive:
-            d = p.next()
+            d = next(p)
             if d not in dirs:
               dirs.add(d)
               yield ('d', prefix+d, d, None)
@@ -169,11 +169,11 @@ class HgRepo(VCSRepo):
           startlog = 0
         if startlog is not None:
           with tempfile.NamedTemporaryFile() as style:
-            style.write(
+            style.write((
               r"changeset = '{rev}\n{node}\n{parents}\n{files}\0'" '\n'
               r"parent = '{rev} '" '\n'
               r"file = '{file|escape}\n'" '\n'
-            )
+            ).encode())
             style.flush()
             cmd = [HG, 'log', '--style', style.name, '-r', '%d:' % startlog]
             output = self._command(cmd)
@@ -232,11 +232,11 @@ class HgRepo(VCSRepo):
           x = r - 1
           if x not in ancestors:
             heapq.heappush(ancestors, -x)
-        for p in lookup_commit.keys():
+        for p in list(lookup_commit):
           prefix = p.rstrip('/') + '/'
           for l in lines[3:]:
             if l == p or l.startswith(prefix):
-              commit = lines[1]
+              commit = str(lines[1])
               entry, objid = lookup_commit[p]
               entry.commit = commit
               if objid:
@@ -382,7 +382,7 @@ class HgRepo(VCSRepo):
         copy = line.lstrip()
       else:
         status, path = line.split(None, 1)
-        entry = FileChangeInfo(path, status, copy)
+        entry = FileChangeInfo(path, str(status), copy)
         results.append(entry)
         copy = None
     results.reverse()
