@@ -29,7 +29,7 @@ SVNLOOK = 'svnlook'
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
-changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)$\)')
+changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)\)$')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
