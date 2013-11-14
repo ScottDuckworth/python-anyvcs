@@ -46,6 +46,8 @@ Supported Operations
 * ``blame()`` - blame (a.k.a. annotate) lines of a file
 * ``canonical_rev()`` - get the canonical revision identifier
 * ``private_path`` - a path in the repository where untracked data can be stored
+* ``dump()`` - create a Subversion dumpfile (Subversion only)
+* ``load()`` - load a Subversion dumpfile (Subversion only)
 
 Operations that are not natively supported by the underlying version control
 system are implemented in this library.
