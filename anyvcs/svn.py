@@ -202,12 +202,13 @@ class SvnRepo(VCSRepo):
                          stderr=subprocess.PIPE)
     output, stderr = p.communicate()
     if p.returncode != 0:
+      stderr = stderr.decode()
       if p.returncode == 1 and 'File not found' in stderr:
         raise PathDoesNotExist(rev, path)
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
     results = []
-    lines = output.splitlines()
+    lines = output.decode().splitlines()
     if forcedir and not lines[0].endswith('/'):
       raise PathDoesNotExist(rev, path)
     if lines[0].endswith('/'):
@@ -287,7 +288,7 @@ class SvnRepo(VCSRepo):
     def match(n, path):
       for d in self.ls(youngest, path):
         if d.get('type') == 'd':
-          for k, v in n.iteritems():
+          for k, v in n.items():
             if fnmatch.fnmatchcase(d.name, k):
               if path:
                 p = path + '/' + d.name
@@ -376,13 +377,13 @@ class SvnRepo(VCSRepo):
         results = filter(lambda x: len(x.parents) > 1, results)
       else:
         results = filter(lambda x: len(x.parents) <= 1, results)
-    return results
+    return list(results)
 
   def _logentry(self, rev, path, history=None):
     import hashlib
     revstr = str(rev)
     cmd = [SVNLOOK, 'info', '.', '-r', revstr]
-    cachekey = hashlib.sha1(revstr).hexdigest()
+    cachekey = hashlib.sha1(revstr.encode()).hexdigest()
     entry = self._commit_cache.get(cachekey)
     if entry:
       return entry
@@ -450,7 +451,7 @@ class SvnRepo(VCSRepo):
       stdout, stderr = p.communicate()
       if p.returncode not in (0, 1):
         raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
-      return stdout
+      return stdout.decode()
     finally:
       shutil.rmtree(tmpdir)
 
@@ -473,7 +474,7 @@ class SvnRepo(VCSRepo):
         m = changed_copy_info_rx.match(line)
         assert m
         copy = m.group('src')
-      entry = FileChangeInfo(path, status, copy)
+      entry = FileChangeInfo(path, str(status), copy)
       results.append(entry)
     return results
 

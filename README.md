@@ -40,7 +40,7 @@ Compatibility
 
 python-anyvcs should work with the following software versions:
 
-  * Python: 2.6, 2.7
+  * Python: 2.6 or later (including 3.0 or later)
   * Git: 1.7.0 or later
   * Mercurial: 1.6.1 or later
   * Subversion: 1.5 or later
