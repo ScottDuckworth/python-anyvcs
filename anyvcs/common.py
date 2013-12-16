@@ -347,6 +347,8 @@ class VCSRepo(object):
   @abstractmethod
   def empty(self):
     """Test if the repository contains any commits
+
+    Commits that exist by default (e.g. a zero commit) are not counted.
     """
     return NotImplementedError
 
@@ -359,6 +361,8 @@ class VCSRepo(object):
   @abstractmethod
   def __len__(self):
     """Returns the number of commits in the repository
+
+    Commits that exist by default (e.g. a zero commit) are not counted.
     """
     return NotImplementedError
 
