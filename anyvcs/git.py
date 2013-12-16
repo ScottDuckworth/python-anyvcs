@@ -295,7 +295,7 @@ class GitRepo(VCSRepo):
     return results
 
   def changed(self, rev):
-    cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-c', '--root', rev]
+    cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-c', '--first-parent', '--root', rev]
     output = self._command(cmd)
     results = []
     for m in diff_tree_rx.finditer(output):
@@ -308,7 +308,7 @@ class GitRepo(VCSRepo):
     return results
 
   def pdiff(self, rev):
-    cmd = [GIT, 'diff-tree', '-p', '-r', '-c', '--root', rev]
+    cmd = [GIT, 'diff-tree', '-p', '-r', '-c', '--first-parent', '--root', rev]
     return self._command(cmd)
 
   def diff(self, rev_a, rev_b, path=None):
