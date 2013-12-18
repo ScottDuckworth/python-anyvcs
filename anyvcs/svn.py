@@ -175,9 +175,13 @@ class SvnRepo(VCSRepo):
       return (rev, '/' + head)
 
   def canonical_rev(self, rev):
+    try:
+      types = (str, unicode)
+    except NameError:
+      types = str
     if isinstance(rev, int):
       return rev
-    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+    elif isinstance(rev, types) and rev.isdigit():
       return int(rev)
     else:
       rev, prefix = self._maprev(rev)
