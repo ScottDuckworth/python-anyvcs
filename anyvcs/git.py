@@ -84,11 +84,7 @@ class GitRepo(VCSRepo):
       return rev
     else:
       cmd = [GIT, 'rev-parse', rev]
-<<<<<<< HEAD
       return self._command(cmd).decode().rstrip()
-=======
-      return self._command(cmd).strip()
->>>>>>> develop
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
