@@ -267,28 +267,33 @@ class VCSRepo(object):
          directory=False, report=()):
     """List directory or file
 
-    Arguments:
-    rev             The revision to use.
-    path            The path to list. May start with a '/' or not. Directories
-                    may end with a '/' or not.
-    recursive       Recursively list files in subdirectories.
-    recursive_dirs  Used when recursive=True, also list directories.
-    directory       If path is a directory, list path itself instead of its
-                    contents.
-    report          A list or tuple of extra attributes to return that may
-                    require extra processing. Recognized values are 'size',
-                    'target', 'executable', and 'commit'.
+    :param rev: The revision to use.
+    :param path: The path to list. May start with a '/' or not. Directories
+                 may end with a '/' or not.
+    :param recursive: Recursively list files in subdirectories.
+    :param recursive_dirs: Used when recursive=True, also list directories.
+    :param directory: If path is a directory, list path itself instead of its
+                      contents.
+    :param report: A list or tuple of extra attributes to return that may
+                   require extra processing. Recognized values are 'size',
+                   'target', 'executable', and 'commit'.
 
     Returns a list of dictionaries with the following keys:
-    type        The type of the file: 'f' for file, 'd' for directory, 'l' for
-                symlink.
-    name        The name of the file. Not present if directory=True.
-    size        The size of the file. Only present for files when 'size' is in
-                report.
-    target      The target of the symlink. Only present for symlinks when
-                'target' is in report.
-    executable  True if the file is executable, False otherwise.  Only present
-                for files when 'executable' is in report.
+
+    **type**
+      The type of the file: 'f' for file, 'd' for directory, 'l' for
+      symlink.
+    **name**
+      The name of the file. Not present if directory=True.
+    **size**
+      The size of the file. Only present for files when 'size' is in
+      report.
+    **target**
+      The target of the symlink. Only present for symlinks when
+      'target' is in report.
+    **executable**
+      True if the file is executable, False otherwise.  Only present
+      for files when 'executable' is in report.
 
     Raises PathDoesNotExist if the path does not exist.
 
@@ -299,9 +304,8 @@ class VCSRepo(object):
   def cat(self, rev, path):
     """Get file contents
 
-    Arguments:
-    rev             The revision to use.
-    path            The path to the file. Must be a file.
+    :param rev: The revision to use.
+    :param path: The path to the file. Must be a file.
 
     Returns the file contents as a string.
 
@@ -315,9 +319,8 @@ class VCSRepo(object):
   def readlink(self, rev, path):
     """Get symbolic link target
 
-    Arguments:
-    rev             The revision to use.
-    path            The path to the file. Must be a symbolic link.
+    :param rev: The revision to use.
+    :param path: The path to the file. Must be a symbolic link.
 
     Returns the target of the symbolic link as a string.
 
@@ -372,15 +375,14 @@ class VCSRepo(object):
           path=None, follow=False):
     """Get commit logs
 
-    Arguments:
-    revrange     Either a single revision or a range of revisions as a 2
-                 element list or tuple.
-    limit        Limit the number of log entries.
-    firstparent  Only follow the first parent of merges.
-    merges       True means only merges, False means no merges, None means
-                 both merges and non-merges.
-    path         Only match commits containing changes on this path.
-    follow       Follow file history across renames.
+    :param revrange: Either a single revision or a range of revisions as a 2
+                     element list or tuple.
+    :param limit: Limit the number of log entries.
+    :param firstparent: Only follow the first parent of merges.
+    :param merges: True means only merges, False means no merges, None means
+                   both merges and non-merges.
+    :param path:   Only match commits containing changes on this path.
+    :param follow: Follow file history across renames.
 
     If revrange is None, return a list of all log entries in reverse
     chronological order.
