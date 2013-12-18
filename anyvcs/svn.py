@@ -428,7 +428,7 @@ class SvnRepo(VCSRepo):
       return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
-    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+    if sys.hexversion < 0x02070000:
       _output = ''
       for line in output.splitlines(True):
         line = re.sub(r'^--- ', '--- a/', line)
