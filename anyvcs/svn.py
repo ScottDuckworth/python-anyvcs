@@ -48,12 +48,14 @@ class SvnRepo(VCSRepo):
   """A Subversion repository
 
   Unless otherwise specified, valid revisions are:
+
   - an integer (ex: 194)
   - an integer as a string (ex: "194")
   - a branch or tag name (ex: "HEAD", "trunk", "branches/branch1")
   - a branch or tag name at a specific revision (ex: "trunk:194")
 
   Revisions have the following meanings:
+
   - HEAD always maps to the root of the repository (/)
   - Anything else (ex: "trunk", "branches/branch1") maps to the corresponding
     path in the repository
@@ -62,16 +64,16 @@ class SvnRepo(VCSRepo):
   For example, the following code will list the contents of the directory
   branches/branch1/src from revision 194:
 
-      repo = SvnRepo(path)
-      repo.ls('branches/branch1:194', 'src')
+      >>> repo = SvnRepo(path)
+      >>> repo.ls('branches/branch1:194', 'src')
 
   Branches and tags are detected in branches() and tags() by looking at the
   paths specified in repo.branch_glob and repo.tag_glob.  The default values
   for these variables will detect the following repository layout:
 
-      /trunk - the main development branch
-      /branches/* - branches
-      /tags/* - tags
+  - /trunk - the main development branch
+  - /branches/* - branches
+  - /tags/* - tags
 
   If a repository does not fit this layout, everything other than branch and
   tag detection will work as expected.
@@ -610,13 +612,12 @@ class SvnRepo(VCSRepo):
            incremental=False, deltas=False):
     """Dump the repository to a dumpfile stream.
 
-    Arguments:
-    stream    A file stream to which the dumpfile is written
-    progress  A file stream to which progress is written
-    lower     Must be a numeric version number
-    upper     Must be a numeric version number
+    :param stream: A file stream to which the dumpfile is written
+    :param progress: A file stream to which progress is written
+    :param lower: Must be a numeric version number
+    :param upper: Must be a numeric version number
 
-    See `svnadmin help dump' for details on the other arguments.
+    See ``svnadmin help dump`` for details on the other arguments.
 
     """
     cmd = [SVNADMIN, 'dump', '.']
@@ -642,11 +643,10 @@ class SvnRepo(VCSRepo):
            parent_dir=None):
     """Load a dumpfile stream into the repository.
 
-    Arguments:
-    stream    A file stream from which the dumpfile is read
-    progress  A file stream to which progress is written
+    :param stream: A file stream from which the dumpfile is read
+    :param progress: A file stream to which progress is written
 
-    See `svnadmin help load' for details on the other arguments.
+    See ``svnadmin help load`` for details on the other arguments.
 
     """
     cmd = [SVNADMIN, 'load', '.']
