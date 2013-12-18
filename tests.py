@@ -908,6 +908,10 @@ class BasicTest(object):
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
 
+  def test_canonical_rev(self):
+    result = self.repo.canonical_rev(self.working_head)
+    self.assertEqual(self.rev1, result)
+
 class GitLikeBasicTest(BasicTest):
   def test_log_all(self):
     result = self.repo.log()
