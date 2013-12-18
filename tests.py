@@ -1209,7 +1209,7 @@ class BranchTestStep3(object):
     correct = [{'path':branch_prefix+'a', 'name':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1221,9 +1221,9 @@ class BranchTestStep3(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 3', result)
+    self.assertEqual('step 3'.encode(), result)
 
 class GitLikeBranchTestStep3(BranchTestStep3):
   def test_branches(self):
@@ -1357,9 +1357,9 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1372,11 +1372,11 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 3', result)
+    self.assertEqual('step 3'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch1a(self):
     branch1a = self.encode_branch('branch1a')
@@ -1389,11 +1389,11 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1a, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1a, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1a, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch2(self):
     branch2 = self.encode_branch('branch2')
@@ -1405,9 +1405,9 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch2, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch2, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
   def test_diff_main_branch1a(self):
     branch1a = self.encode_branch('branch1a')
@@ -1614,9 +1614,9 @@ class BranchTestStep9(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1629,11 +1629,11 @@ class BranchTestStep9(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
 class GitLikeBranchTestStep9(BranchTestStep9):
   def test_log_main(self):
@@ -1740,11 +1740,11 @@ class BranchTestStep11(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 11', result)
+    self.assertEqual('step 11'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
 class GitLikeBranchTestStep11(BranchTestStep11):
   def test_log_main(self):
@@ -1873,11 +1873,11 @@ class BranchTestStep13(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 11', result)
+    self.assertEqual('step 11'.encode(), result)
     result = self.repo.cat(self.main_branch, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
 class GitLikeBranchTestStep13(BranchTestStep13):
   def test_branches(self):
