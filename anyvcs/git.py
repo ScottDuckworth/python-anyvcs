@@ -105,7 +105,7 @@ class GitRepo(VCSRepo):
       return rev
     else:
       cmd = [GIT, 'rev-parse', rev]
-      return self._command(cmd)
+      return self._command(cmd).strip()
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
