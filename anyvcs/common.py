@@ -214,9 +214,10 @@ class UTCOffset(datetime.tzinfo):
 class VCSRepo(object):
   __metaclass__ = ABCMetaDocStringInheritor
 
-  def __init__(self, path):
+  def __init__(self, path, encoding='utf-8'):
     """Open an existing repository"""
     self.path = path
+    self.encoding = encoding
 
   @abstractproperty
   def private_path(self):
@@ -241,14 +242,14 @@ class VCSRepo(object):
     kwargs.setdefault('cwd', self.path)
     try:
       output = subprocess.check_output(cmd, **kwargs)
-      return output.decode()
+      return output
     except AttributeError: # subprocess.check_output added in python 2.7
       kwargs.setdefault('stdout', subprocess.PIPE)
       p = subprocess.Popen(cmd, **kwargs)
       stdout, stderr = p.communicate()
       if p.returncode != 0:
         raise subprocess.CalledProcessError(p.returncode, cmd)
-      return stdout.decode()
+      return stdout
 
   @classmethod
   def cleanPath(cls, path):

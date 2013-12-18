@@ -784,22 +784,22 @@ class BasicTest(object):
 
   def test_cat1(self):
     result = self.repo.cat(self.main_branch, 'a')
-    correct = 'Pisgah'
+    correct = 'Pisgah'.encode()
     self.assertEqual(correct, result)
 
   def test_cat2(self):
     result = self.repo.cat(self.main_branch, '/a')
-    correct = 'Pisgah'
+    correct = 'Pisgah'.encode()
     self.assertEqual(correct, result)
 
   def test_cat3(self):
     result = self.repo.cat(self.main_branch, 'c/d/e')
-    correct = 'Denali'
+    correct = 'Denali'.encode()
     self.assertEqual(correct, result)
 
   def test_cat4(self):
     result = self.repo.cat(self.main_branch, '/c/d/e')
-    correct = 'Denali'
+    correct = 'Denali'.encode()
     self.assertEqual(correct, result)
 
   def test_cat_error1(self):
@@ -884,7 +884,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.rev1)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff.encode())
+    p.communicate(pdiff)
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -906,7 +906,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.main_branch)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff.encode())
+    p.communicate(pdiff)
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -1413,7 +1413,7 @@ class BranchTestStep7(object):
     self.export(branch1a, path_b)
     diff = self.repo.diff(self.main_branch, branch1a)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(diff.encode())
+    p.communicate(diff)
     self.assertEqual(0, p.returncode)
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)

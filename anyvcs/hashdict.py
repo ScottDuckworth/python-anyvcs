@@ -64,8 +64,8 @@ class HashDict(collections.MutableMapping):
       raise
 
   def __setitem__(self, key, value):
-    assert isinstance(value, str)
     int(key, 16)
+    value = str(value)
     d = os.path.join(self.path, key[:2])
     p = os.path.join(d, key[2:])
     try:
