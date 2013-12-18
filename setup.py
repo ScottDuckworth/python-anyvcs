@@ -13,7 +13,7 @@ setup(
   version=__version__,
   packages=['anyvcs'],
   include_package_data=True,
-  license='GNU Lesser General Public License v3 (LGPLv3)',
+  license='BSD',
   description='An abstraction layer for multiple version control systems.',
   long_description=README,
   url='https://github.com/ScottDuckworth/python-anyvcs',
@@ -21,7 +21,7 @@ setup(
   author_email='sduckwo@clemson.edu',
   classifiers=[
     'Intended Audience :: Developers',
-    'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
+    'License :: OSI Approved :: BSD License',
     'Operating System :: POSIX',
     'Programming Language :: Python',
     'Programming Language :: Python :: 2.6',
