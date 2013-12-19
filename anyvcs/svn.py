@@ -119,7 +119,7 @@ class SvnRepo(VCSRepo):
 
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
-    output = self._command(cmd)
+    output = self._command(cmd).decode()
     return [x.strip() for x in output.splitlines()]
 
   def proplist(self, rev, path=None):
@@ -133,7 +133,7 @@ class SvnRepo(VCSRepo):
 
   def _propget(self, prop, rev, path):
     cmd = [SVNLOOK, 'propget', '-r', rev, '.', prop, path or '--revprop']
-    return self._command(cmd)
+    return self._command(cmd).decode()
 
   def propget(self, prop, rev, path=None):
     """Get Subversion property value of the path"""
@@ -225,7 +225,7 @@ class SvnRepo(VCSRepo):
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
     results = []
-    lines = output.decode().splitlines()
+    lines = output.decode(self.encoding, 'replace').splitlines()
     if forcedir and not lines[0].endswith('/'):
       raise PathDoesNotExist(rev, path)
     if lines[0].endswith('/'):
@@ -244,7 +244,8 @@ class SvnRepo(VCSRepo):
       else:
         proplist = self._proplist(revstr, name)
         if 'svn:special' in proplist:
-          link = self._cat(revstr, name).split(None, 1)
+          link = self._cat(revstr, name).decode(self.encoding, 'replace')
+          link = link.split(None, 1)
           if len(link) == 2 and link[0] == 'link':
             entry.type = 'l'
             if 'target' in report:
@@ -263,7 +264,7 @@ class SvnRepo(VCSRepo):
     return results
 
   def _cat(self, rev, path):
-    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path]
+    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path.encode(self.encoding)]
     return self._command(cmd)
 
   def cat(self, rev, path):
@@ -277,7 +278,7 @@ class SvnRepo(VCSRepo):
 
   def _readlink(self, rev, path):
     output = self._cat(rev, path)
-    link = output.split(None, 1)
+    link = output.decode(self.encoding, 'replace').split(None, 1)
     assert len(link) == 2 and link[0] == 'link'
     return link[1]
 
@@ -403,8 +404,9 @@ class SvnRepo(VCSRepo):
     cachekey = hashlib.sha1(revstr.encode()).hexdigest()
     entry = self._commit_cache.get(cachekey)
     if entry:
+      entry._cached = True
       return entry
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     author, date, logsize, message = output.split('\n', 3)
     date = parse_isodate(date)
     if history is None:
@@ -434,15 +436,14 @@ class SvnRepo(VCSRepo):
       return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
-    if sys.hexversion < 0x02070000:
-      _output = ''
-      for line in output.splitlines(True):
-        line = re.sub(r'^--- ', '--- a/', line)
-        _output += re.sub(r'^\+\+\+ ', '+++ b/', line)
-      output = _output
-    else:
-      output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
-      output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
+    _output = b''
+    for line in output.splitlines(True):
+      if line.startswith(b'--- '):
+        line = b'--- a/' + line[4:]
+      if line.startswith(b'+++ '):
+        line = b'+++ b/' + line[4:]
+      _output += line
+    output = _output
     return output
 
   def diff(self, rev_a, rev_b, path=None):
@@ -468,7 +469,7 @@ class SvnRepo(VCSRepo):
       stdout, stderr = p.communicate()
       if p.returncode not in (0, 1):
         raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
-      return stdout.decode()
+      return stdout
     finally:
       shutil.rmtree(tmpdir)
 
@@ -477,7 +478,7 @@ class SvnRepo(VCSRepo):
     if rev == 0:
       return []
     cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     lines = output.splitlines()
     lines.reverse()
     results = []
@@ -499,7 +500,7 @@ class SvnRepo(VCSRepo):
     cmd = [SVNLOOK, 'history', '.', '-r', str(rev), path]
     if limit is not None:
       cmd.extend(['-l', str(limit)])
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     results = []
     for line in output.splitlines()[2:]:
       r, p = line.split(None, 1)
