@@ -332,12 +332,12 @@ class GitRepo(VCSRepo):
     if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
     cmd = [GIT, 'blame', '--root', '--encoding=none', '-p', rev, '--', path]
-    output = self._command(cmd).decode(self.encoding, 'replace')
+    output = self._command(cmd)
     rev = None
     revinfo = {}
     results = []
     for line in output.splitlines():
-      if line.startswith('\t'):
+      if line.startswith(b'\t'):
         ri = revinfo[rev]
         author = ri['author'] + ' ' + ri['author-mail']
         ts = int(ri['author-time'])
@@ -346,7 +346,7 @@ class GitRepo(VCSRepo):
         entry = BlameInfo(rev, author, date, line[1:])
         results.append(entry)
       else:
-        k, v = line.split(None, 1)
+        k, v = line.decode(self.encoding, 'replace').split(None, 1)
         if rev_rx.match(k):
           rev = k
         else:
