@@ -225,7 +225,7 @@ class SvnRepo(VCSRepo):
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
     results = []
-    lines = output.decode().splitlines()
+    lines = output.decode(self.encoding, 'replace').splitlines()
     if forcedir and not lines[0].endswith('/'):
       raise PathDoesNotExist(rev, path)
     if lines[0].endswith('/'):
@@ -264,7 +264,7 @@ class SvnRepo(VCSRepo):
     return results
 
   def _cat(self, rev, path):
-    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path]
+    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path.encode(self.encoding)]
     return self._command(cmd)
 
   def cat(self, rev, path):

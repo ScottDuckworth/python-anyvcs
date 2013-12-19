@@ -49,6 +49,10 @@ keep_test_dir = False
 logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
+# to use for encoding tests
+aenema_utf8_encoded = b'\xc3\x86nema'
+aenema = aenema_utf8_encoded.decode('utf-8')
+
 def check_call(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stdout', logfile)
@@ -59,7 +63,7 @@ def check_output(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stderr', logfile)
   try:
-    return subprocess.check_output(args, **kwargs).decode()
+    return subprocess.check_output(args, **kwargs)
   except AttributeError: # subprocess.check_output added in python 2.7
     kwargs.setdefault('stdout', subprocess.PIPE)
     p = subprocess.Popen(args, **kwargs)
@@ -158,7 +162,7 @@ class GitTest(VCSTest):
   @classmethod
   def getAbsoluteRev(cls):
     try:
-      return cls.check_output(['git', 'log', '-1', '--pretty=format:%H'])
+      return cls.check_output(['git', 'log', '-1', '--pretty=format:%H']).decode()
     except subprocess.CalledProcessError:
       return None
 
@@ -169,7 +173,7 @@ class GitTest(VCSTest):
     data = check_output(cmd1, cwd=cls.main_path)
     cmd2 = ['tar', '-x', '-C', path]
     p = subprocess.Popen(cmd2, stdin=subprocess.PIPE)
-    p.communicate(data.encode())
+    p.communicate(data)
     if p.returncode != 0:
       raise subprocess.CalledProcessError(p.returncode, cmd2)
 
@@ -187,7 +191,7 @@ class HgTest(VCSTest):
 
   @classmethod
   def getAbsoluteRev(cls):
-    return cls.check_output(['hg', 'log', '-l1', '--template={node}'])
+    return cls.check_output(['hg', 'log', '-l1', '--template={node}']).decode()
 
   @classmethod
   def export(cls, rev, path):
@@ -1976,6 +1980,79 @@ class SvnCacheTest(SvnTest, CacheTest):
       self.assertEqual(self.rev1, result[0].rev)
       self.assertIsInstance(result[0].date, datetime.datetime)
     self.assertTrue(result[0]._cached)
+
+### TEST CASE: UTF8EncodingTest ###
+
+class UTF8EncodingTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    cls.repo.encoding = 'utf-8'
+    p = os.path.join(working_path, aenema)
+    with open(p.encode(cls.repo.encoding), 'wb') as f:
+      f.write(aenema.encode(cls.repo.encoding))
+    os.symlink(aenema.encode(cls.repo.encoding), os.path.join(working_path, 'b'))
+    yield Commit(('modify ' + aenema).encode(cls.repo.encoding))
+
+  def test_ls(self):
+    correct = [
+      {'path':aenema, 'name':aenema, 'type':'f'},
+      {'path':'b',    'name':'b',    'type':'l', 'target':aenema},
+    ]
+    result = self.repo.ls(self.main_branch, '/', report=['target'])
+    self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+  def test_cat(self):
+    correct = aenema.encode(self.repo.encoding)
+    result = self.repo.cat(self.main_branch, aenema)
+    self.assertEqual(correct, result)
+
+  def test_log(self):
+    correct = 'modify ' + aenema
+    result = self.repo.log(revrange=self.main_branch)
+    self.assertEqual(correct, result.message.rstrip())
+
+class GitUTF8EncodingTest(GitTest, UTF8EncodingTest): pass
+class HgUTF8EncodingTest(HgTest, UTF8EncodingTest): pass
+class SvnUTF8EncodingTest(SvnTest, UTF8EncodingTest): pass
+
+### TEST CASE: Latin1EncodingTest ###
+
+class Latin1EncodingTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    cls.repo.encoding = 'latin1'
+    p = os.path.join(working_path, aenema)
+    with open(p.encode(cls.repo.encoding), 'wb') as f:
+      f.write(aenema.encode(cls.repo.encoding))
+    os.symlink(aenema.encode(cls.repo.encoding), os.path.join(working_path, 'b'))
+    yield Commit(('modify ' + aenema).encode(cls.repo.encoding))
+
+  def test_ls(self):
+    correct = [
+      {'path':aenema, 'name':aenema, 'type':'f'},
+      {'path':'b',    'name':'b',    'type':'l', 'target':aenema},
+    ]
+    result = self.repo.ls(self.main_branch, '/', report=['target'])
+    self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+  def test_cat(self):
+    correct = aenema.encode(self.repo.encoding)
+    result = self.repo.cat(self.main_branch, aenema)
+    self.assertEqual(correct, result)
+
+  def test_log(self):
+    correct = 'modify ' + aenema
+    result = self.repo.log(revrange=self.main_branch)
+    self.assertEqual(correct, result.message.rstrip())
+
+class GitLatin1EncodingTest(GitTest, Latin1EncodingTest): pass
+
+if os.getenv('HGENCODING') and os.getenv('HGENCODING').lower() == 'latin1':
+  class HgLatin1EncodingTest(HgTest, Latin1EncodingTest): pass
+
+# By default, Subversion only allows UTF-8 strings in commits so we'll skip
+# this test.
+#class SvnLatin1EncodingTest(SvnTest, Latin1EncodingTest): pass
 
 
 if __name__ == '__main__':

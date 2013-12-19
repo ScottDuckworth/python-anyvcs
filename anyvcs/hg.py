@@ -259,7 +259,7 @@ class HgRepo(VCSRepo):
     return results
 
   def _cat(self, rev, path):
-    cmd = [HG, 'cat', '-r', rev, path]
+    cmd = [HG, 'cat', '-r', rev, path.encode(self.encoding)]
     return self._command(cmd)
 
   def cat(self, rev, path):
