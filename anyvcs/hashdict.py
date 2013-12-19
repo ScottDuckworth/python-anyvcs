@@ -65,7 +65,6 @@ class HashDict(collections.MutableMapping):
 
   def __setitem__(self, key, value):
     int(key, 16)
-    value = str(value)
     d = os.path.join(self.path, key[:2])
     p = os.path.join(d, key[2:])
     try:
