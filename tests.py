@@ -36,7 +36,7 @@ import subprocess
 import sys
 import tempfile
 import time
-if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+if sys.hexversion < 0x02070000:
   import unittest2 as unittest
 else:
   import unittest
@@ -49,6 +49,10 @@ keep_test_dir = False
 logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
+# to use for encoding tests
+aenema_utf8_encoded = b'\xc3\x86nema'
+aenema = aenema_utf8_encoded.decode('utf-8')
+
 def check_call(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stdout', logfile)
@@ -59,7 +63,7 @@ def check_output(args, **kwargs):
   logfile.write('%s\n' % repr(args))
   kwargs.setdefault('stderr', logfile)
   try:
-    return subprocess.check_output(args, **kwargs).decode()
+    return subprocess.check_output(args, **kwargs)
   except AttributeError: # subprocess.check_output added in python 2.7
     kwargs.setdefault('stdout', subprocess.PIPE)
     p = subprocess.Popen(args, **kwargs)
@@ -158,7 +162,7 @@ class GitTest(VCSTest):
   @classmethod
   def getAbsoluteRev(cls):
     try:
-      return cls.check_output(['git', 'log', '-1', '--pretty=format:%H'])
+      return cls.check_output(['git', 'log', '-1', '--pretty=format:%H']).decode()
     except subprocess.CalledProcessError:
       return None
 
@@ -169,7 +173,7 @@ class GitTest(VCSTest):
     data = check_output(cmd1, cwd=cls.main_path)
     cmd2 = ['tar', '-x', '-C', path]
     p = subprocess.Popen(cmd2, stdin=subprocess.PIPE)
-    p.communicate(data.encode())
+    p.communicate(data)
     if p.returncode != 0:
       raise subprocess.CalledProcessError(p.returncode, cmd2)
 
@@ -187,7 +191,7 @@ class HgTest(VCSTest):
 
   @classmethod
   def getAbsoluteRev(cls):
-    return cls.check_output(['hg', 'log', '-l1', '--template={node}'])
+    return cls.check_output(['hg', 'log', '-l1', '--template={node}']).decode()
 
   @classmethod
   def export(cls, rev, path):
@@ -784,22 +788,22 @@ class BasicTest(object):
 
   def test_cat1(self):
     result = self.repo.cat(self.main_branch, 'a')
-    correct = 'Pisgah'
+    correct = 'Pisgah'.encode()
     self.assertEqual(correct, result)
 
   def test_cat2(self):
     result = self.repo.cat(self.main_branch, '/a')
-    correct = 'Pisgah'
+    correct = 'Pisgah'.encode()
     self.assertEqual(correct, result)
 
   def test_cat3(self):
     result = self.repo.cat(self.main_branch, 'c/d/e')
-    correct = 'Denali'
+    correct = 'Denali'.encode()
     self.assertEqual(correct, result)
 
   def test_cat4(self):
     result = self.repo.cat(self.main_branch, '/c/d/e')
-    correct = 'Denali'
+    correct = 'Denali'.encode()
     self.assertEqual(correct, result)
 
   def test_cat_error1(self):
@@ -884,7 +888,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.rev1)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff.encode())
+    p.communicate(pdiff)
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -906,7 +910,7 @@ class BasicTest(object):
     self.export(self.rev1, path_b)
     pdiff = self.repo.pdiff(self.main_branch)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(pdiff.encode())
+    p.communicate(pdiff)
     self.assertEqual(0, p.returncode)
     # symlinks are not reconstructed by patch, so just make sure the file exists
     # then remove it so that diff works
@@ -918,6 +922,10 @@ class BasicTest(object):
     os.unlink(os.path.join(path_b, 'c', 'd', 'f'))
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
+
+  def test_canonical_rev(self):
+    result = self.repo.canonical_rev(self.working_head)
+    self.assertEqual(self.rev1, result)
 
 class GitLikeBasicTest(BasicTest):
   def test_log_all(self):
@@ -943,7 +951,7 @@ class GitLikeBasicTest(BasicTest):
     self.assertEqual(self.rev1, result[0].rev)
     self.assertEqual('Test User <me@example.com>', result[0].author)
     self.assertIsInstance(result[0].date, datetime.datetime)
-    self.assertEqual('Pisgah', result[0].line)
+    self.assertEqual('Pisgah'.encode(), result[0].line)
 
 class GitBasicTest(GitTest, GitLikeBasicTest):
   def test_branches(self):
@@ -1027,7 +1035,7 @@ class SvnBasicTest(SvnTest, BasicTest):
     self.assertEqual(self.rev1, result[0].rev)
     self.assertEqual(getpass.getuser(), result[0].author)
     self.assertIsInstance(result[0].date, datetime.datetime)
-    self.assertEqual('Pisgah', result[0].line)
+    self.assertEqual('Pisgah'.encode(), result[0].line)
 
 ### TEST CASE: UnrelatedBranchTest ###
 
@@ -1205,7 +1213,7 @@ class BranchTestStep3(object):
     correct = [{'path':branch_prefix+'a', 'name':'a', 'type':'f'}]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1217,9 +1225,9 @@ class BranchTestStep3(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 3', result)
+    self.assertEqual('step 3'.encode(), result)
 
 class GitLikeBranchTestStep3(BranchTestStep3):
   def test_branches(self):
@@ -1353,9 +1361,9 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1368,11 +1376,11 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 3', result)
+    self.assertEqual('step 3'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch1a(self):
     branch1a = self.encode_branch('branch1a')
@@ -1385,11 +1393,11 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1a, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1a, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1a, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
   def test_branch2(self):
     branch2 = self.encode_branch('branch2')
@@ -1401,9 +1409,9 @@ class BranchTestStep7(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch2, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch2, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
   def test_diff_main_branch1a(self):
     branch1a = self.encode_branch('branch1a')
@@ -1413,7 +1421,7 @@ class BranchTestStep7(object):
     self.export(branch1a, path_b)
     diff = self.repo.diff(self.main_branch, branch1a)
     p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-    p.communicate(diff.encode())
+    p.communicate(diff)
     self.assertEqual(0, p.returncode)
     rc = subprocess.call(['diff', '-urN', path_a, path_b])
     self.assertEqual(0, rc)
@@ -1610,9 +1618,9 @@ class BranchTestStep9(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
   def test_branch1(self):
     branch1 = self.encode_branch('branch1')
@@ -1625,11 +1633,11 @@ class BranchTestStep9(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 2', result)
+    self.assertEqual('step 2'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 4', result)
+    self.assertEqual('step 4'.encode(), result)
 
 class GitLikeBranchTestStep9(BranchTestStep9):
   def test_log_main(self):
@@ -1736,11 +1744,11 @@ class BranchTestStep11(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(branch1, '/a')
-    self.assertEqual('step 11', result)
+    self.assertEqual('step 11'.encode(), result)
     result = self.repo.cat(branch1, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(branch1, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
 class GitLikeBranchTestStep11(BranchTestStep11):
   def test_log_main(self):
@@ -1869,11 +1877,11 @@ class BranchTestStep13(object):
     ]
     self.assertEqual(normalize_ls(correct), normalize_ls(result))
     result = self.repo.cat(self.main_branch, '/a')
-    self.assertEqual('step 11', result)
+    self.assertEqual('step 11'.encode(), result)
     result = self.repo.cat(self.main_branch, '/b')
-    self.assertEqual('step 7', result)
+    self.assertEqual('step 7'.encode(), result)
     result = self.repo.cat(self.main_branch, '/c')
-    self.assertEqual('step 5', result)
+    self.assertEqual('step 5'.encode(), result)
 
 class GitLikeBranchTestStep13(BranchTestStep13):
   def test_branches(self):
@@ -1933,6 +1941,117 @@ class SvnBranchTestStep13(SvnTest, BranchTestStep13):
     result = [x.rev for x in self.repo.log(revrange=(None, self.main_branch), path='/b')]
     correct = [15, 11, 4]
     self.assertEqual(correct, result)
+
+### TEST CASE: CacheTest ###
+
+class CacheTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    with open(os.path.join(working_path, 'a'), 'w') as f:
+      f.write('spoon')
+    yield Commit('modify a')
+    cls.rev1 = cls.getAbsoluteRev()
+
+  def test_log_head(self):
+    for i in range(2):
+      result = self.repo.log(revrange=self.main_branch)
+      self.assertIsInstance(result, CommitLogEntry)
+      self.assertEqual(self.rev1, result.rev)
+      self.assertIsInstance(result.date, datetime.datetime)
+    self.assertTrue(result._cached)
+
+class GitLikeCacheTest(CacheTest):
+  def test_ls(self):
+    correct = [{'path':'a', 'name':'a', 'type':'f', 'commit':self.rev1}]
+    for i in range(2):
+      result = self.repo.ls(self.main_branch, '/', report=['commit'])
+      self.assertEqual(correct, result)
+    self.assertTrue(result[0]._commit_cached)
+
+class GitCacheTest(GitTest, GitLikeCacheTest): pass
+class HgCacheTest(HgTest, GitLikeCacheTest): pass
+class SvnCacheTest(SvnTest, CacheTest):
+  def test_log_all(self):
+    for i in range(2):
+      result = self.repo.log()
+      self.assertIsInstance(result, list)
+      self.assertEqual(2, len(result))
+      self.assertIsInstance(result[0], CommitLogEntry)
+      self.assertEqual(self.rev1, result[0].rev)
+      self.assertIsInstance(result[0].date, datetime.datetime)
+    self.assertTrue(result[0]._cached)
+
+### TEST CASE: UTF8EncodingTest ###
+
+class UTF8EncodingTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    cls.repo.encoding = 'utf-8'
+    p = os.path.join(working_path, aenema)
+    with open(p.encode(cls.repo.encoding), 'wb') as f:
+      f.write(aenema.encode(cls.repo.encoding))
+    os.symlink(aenema.encode(cls.repo.encoding), os.path.join(working_path, 'b'))
+    yield Commit(('modify ' + aenema).encode(cls.repo.encoding))
+
+  def test_ls(self):
+    correct = [
+      {'path':aenema, 'name':aenema, 'type':'f'},
+      {'path':'b',    'name':'b',    'type':'l', 'target':aenema},
+    ]
+    result = self.repo.ls(self.main_branch, '/', report=['target'])
+    self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+  def test_cat(self):
+    correct = aenema.encode(self.repo.encoding)
+    result = self.repo.cat(self.main_branch, aenema)
+    self.assertEqual(correct, result)
+
+  def test_log(self):
+    correct = 'modify ' + aenema
+    result = self.repo.log(revrange=self.main_branch)
+    self.assertEqual(correct, result.message.rstrip())
+
+class GitUTF8EncodingTest(GitTest, UTF8EncodingTest): pass
+class HgUTF8EncodingTest(HgTest, UTF8EncodingTest): pass
+class SvnUTF8EncodingTest(SvnTest, UTF8EncodingTest): pass
+
+### TEST CASE: Latin1EncodingTest ###
+
+class Latin1EncodingTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    cls.repo.encoding = 'latin1'
+    p = os.path.join(working_path, aenema)
+    with open(p.encode(cls.repo.encoding), 'wb') as f:
+      f.write(aenema.encode(cls.repo.encoding))
+    os.symlink(aenema.encode(cls.repo.encoding), os.path.join(working_path, 'b'))
+    yield Commit(('modify ' + aenema).encode(cls.repo.encoding))
+
+  def test_ls(self):
+    correct = [
+      {'path':aenema, 'name':aenema, 'type':'f'},
+      {'path':'b',    'name':'b',    'type':'l', 'target':aenema},
+    ]
+    result = self.repo.ls(self.main_branch, '/', report=['target'])
+    self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+  def test_cat(self):
+    correct = aenema.encode(self.repo.encoding)
+    result = self.repo.cat(self.main_branch, aenema)
+    self.assertEqual(correct, result)
+
+  def test_log(self):
+    correct = 'modify ' + aenema
+    result = self.repo.log(revrange=self.main_branch)
+    self.assertEqual(correct, result.message.rstrip())
+
+# Don't do these tests for now because many systems won't have the latin1
+# locale and the tests will fail.  Also, Mercurial and Subversion will fail
+# by default if you give them non-UTF-8 strings.
+#
+#class GitLatin1EncodingTest(GitTest, Latin1EncodingTest): pass
+#class HgLatin1EncodingTest(HgTest, Latin1EncodingTest): pass
+#class SvnLatin1EncodingTest(SvnTest, Latin1EncodingTest): pass
 
 
 if __name__ == '__main__':

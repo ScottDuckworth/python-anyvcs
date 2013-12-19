@@ -48,12 +48,14 @@ class SvnRepo(VCSRepo):
   """A Subversion repository
 
   Unless otherwise specified, valid revisions are:
+
   - an integer (ex: 194)
   - an integer as a string (ex: "194")
   - a branch or tag name (ex: "HEAD", "trunk", "branches/branch1")
   - a branch or tag name at a specific revision (ex: "trunk:194")
 
   Revisions have the following meanings:
+
   - HEAD always maps to the root of the repository (/)
   - Anything else (ex: "trunk", "branches/branch1") maps to the corresponding
     path in the repository
@@ -62,16 +64,16 @@ class SvnRepo(VCSRepo):
   For example, the following code will list the contents of the directory
   branches/branch1/src from revision 194:
 
-      repo = SvnRepo(path)
-      repo.ls('branches/branch1:194', 'src')
+      >>> repo = SvnRepo(path)
+      >>> repo.ls('branches/branch1:194', 'src')
 
   Branches and tags are detected in branches() and tags() by looking at the
   paths specified in repo.branch_glob and repo.tag_glob.  The default values
   for these variables will detect the following repository layout:
 
-      /trunk - the main development branch
-      /branches/* - branches
-      /tags/* - tags
+  - /trunk - the main development branch
+  - /branches/* - branches
+  - /tags/* - tags
 
   If a repository does not fit this layout, everything other than branch and
   tag detection will work as expected.
@@ -117,7 +119,7 @@ class SvnRepo(VCSRepo):
 
   def _proplist(self, rev, path):
     cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
-    output = self._command(cmd)
+    output = self._command(cmd).decode()
     return [x.strip() for x in output.splitlines()]
 
   def proplist(self, rev, path=None):
@@ -131,7 +133,7 @@ class SvnRepo(VCSRepo):
 
   def _propget(self, prop, rev, path):
     cmd = [SVNLOOK, 'propget', '-r', rev, '.', prop, path or '--revprop']
-    return self._command(cmd)
+    return self._command(cmd).decode()
 
   def propget(self, prop, rev, path=None):
     """Get Subversion property value of the path"""
@@ -175,9 +177,13 @@ class SvnRepo(VCSRepo):
       return (rev, '/' + head)
 
   def canonical_rev(self, rev):
+    try:
+      types = (str, unicode)
+    except NameError:
+      types = str
     if isinstance(rev, int):
       return rev
-    elif isinstance(rev, (str, unicode)) and rev.isdigit():
+    elif isinstance(rev, types) and rev.isdigit():
       return int(rev)
     else:
       rev, prefix = self._maprev(rev)
@@ -219,7 +225,7 @@ class SvnRepo(VCSRepo):
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
     results = []
-    lines = output.decode().splitlines()
+    lines = output.decode(self.encoding, 'replace').splitlines()
     if forcedir and not lines[0].endswith('/'):
       raise PathDoesNotExist(rev, path)
     if lines[0].endswith('/'):
@@ -238,7 +244,8 @@ class SvnRepo(VCSRepo):
       else:
         proplist = self._proplist(revstr, name)
         if 'svn:special' in proplist:
-          link = self._cat(revstr, name).split(None, 1)
+          link = self._cat(revstr, name).decode(self.encoding, 'replace')
+          link = link.split(None, 1)
           if len(link) == 2 and link[0] == 'link':
             entry.type = 'l'
             if 'target' in report:
@@ -257,7 +264,7 @@ class SvnRepo(VCSRepo):
     return results
 
   def _cat(self, rev, path):
-    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path]
+    cmd = [SVNLOOK, 'cat', '-r', rev, '.', path.encode(self.encoding)]
     return self._command(cmd)
 
   def cat(self, rev, path):
@@ -271,7 +278,7 @@ class SvnRepo(VCSRepo):
 
   def _readlink(self, rev, path):
     output = self._cat(rev, path)
-    link = output.split(None, 1)
+    link = output.decode(self.encoding, 'replace').split(None, 1)
     assert len(link) == 2 and link[0] == 'link'
     return link[1]
 
@@ -397,8 +404,9 @@ class SvnRepo(VCSRepo):
     cachekey = hashlib.sha1(revstr.encode()).hexdigest()
     entry = self._commit_cache.get(cachekey)
     if entry:
+      entry._cached = True
       return entry
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     author, date, logsize, message = output.split('\n', 3)
     date = parse_isodate(date)
     if history is None:
@@ -428,15 +436,14 @@ class SvnRepo(VCSRepo):
       return ''
     cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
     output = self._command(cmd)
-    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
-      _output = ''
-      for line in output.splitlines(True):
-        line = re.sub(r'^--- ', '--- a/', line)
-        _output += re.sub(r'^\+\+\+ ', '+++ b/', line)
-      output = _output
-    else:
-      output = re.sub(r'^--- ', '--- a/', output, flags=re.M)
-      output = re.sub(r'^\+\+\+ ', '+++ b/', output, flags=re.M)
+    _output = b''
+    for line in output.splitlines(True):
+      if line.startswith(b'--- '):
+        line = b'--- a/' + line[4:]
+      if line.startswith(b'+++ '):
+        line = b'+++ b/' + line[4:]
+      _output += line
+    output = _output
     return output
 
   def diff(self, rev_a, rev_b, path=None):
@@ -462,7 +469,7 @@ class SvnRepo(VCSRepo):
       stdout, stderr = p.communicate()
       if p.returncode not in (0, 1):
         raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
-      return stdout.decode()
+      return stdout
     finally:
       shutil.rmtree(tmpdir)
 
@@ -471,7 +478,7 @@ class SvnRepo(VCSRepo):
     if rev == 0:
       return []
     cmd = [SVNLOOK, 'changed', '.', '-r', str(rev), '--copy-info']
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     lines = output.splitlines()
     lines.reverse()
     results = []
@@ -493,7 +500,7 @@ class SvnRepo(VCSRepo):
     cmd = [SVNLOOK, 'history', '.', '-r', str(rev), path]
     if limit is not None:
       cmd.extend(['-l', str(limit)])
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     results = []
     for line in output.splitlines()[2:]:
       r, p = line.split(None, 1)
@@ -606,13 +613,12 @@ class SvnRepo(VCSRepo):
            incremental=False, deltas=False):
     """Dump the repository to a dumpfile stream.
 
-    Arguments:
-    stream    A file stream to which the dumpfile is written
-    progress  A file stream to which progress is written
-    lower     Must be a numeric version number
-    upper     Must be a numeric version number
+    :param stream: A file stream to which the dumpfile is written
+    :param progress: A file stream to which progress is written
+    :param lower: Must be a numeric version number
+    :param upper: Must be a numeric version number
 
-    See `svnadmin help dump' for details on the other arguments.
+    See ``svnadmin help dump`` for details on the other arguments.
 
     """
     cmd = [SVNADMIN, 'dump', '.']
@@ -638,11 +644,10 @@ class SvnRepo(VCSRepo):
            parent_dir=None):
     """Load a dumpfile stream into the repository.
 
-    Arguments:
-    stream    A file stream from which the dumpfile is read
-    progress  A file stream to which progress is written
+    :param stream: A file stream from which the dumpfile is read
+    :param progress: A file stream to which progress is written
 
-    See `svnadmin help load' for details on the other arguments.
+    See ``svnadmin help load`` for details on the other arguments.
 
     """
     cmd = [SVNADMIN, 'load', '.']

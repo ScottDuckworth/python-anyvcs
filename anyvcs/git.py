@@ -35,30 +35,8 @@ from .hashdict import HashDict
 
 GIT = 'git'
 
-canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
-ls_tree_rx = re.compile(r'^(?P<mode>[0-7]{6}) (?P<type>tree|blob) (?P<object>[0-9a-f]{40})(?: +(?P<size>\d+|-))?\t(?P<name>.+)$', re.I | re.S)
-diff_tree_rx = re.compile(r"""
-  :
-  (?P<src_mode>[0-7]{6})
-  [ ]
-  (?P<dst_mode>[0-7]{6})
-  [ ]
-  (?P<src_object>[0-9a-f]{40})
-  [ ]
-  (?P<dst_object>[0-9a-f]{40})
-  [ ]
-  (?P<status>.)(?P<score>\d+)?
-  \0
-  (?P<src_path>[^\0]+)
-  \0
-  (?:
-    (?!:)
-    (?P<dst_path>[^\0]+)
-    \0
-  )?
-""", re.VERBOSE)
+rev_rx = re.compile(r'^[0-9a-f]{40}$', re.IGNORECASE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
-rev_rx = re.compile(r'^[0-9a-fA-F]{40}$')
 
 class GitRepo(VCSRepo):
   """A git repository
@@ -68,11 +46,11 @@ class GitRepo(VCSRepo):
   """
 
   @classmethod
-  def create(cls, path):
+  def create(cls, path, encoding='utf-8'):
     """Create a new bare repository"""
     cmd = [GIT, 'init', '--quiet', '--bare', path]
     subprocess.check_call(cmd)
-    return cls(path)
+    return cls(path, encoding)
 
   @property
   def private_path(self):
@@ -101,11 +79,12 @@ class GitRepo(VCSRepo):
       return self._object_cache_v
 
   def canonical_rev(self, rev):
-    if isinstance(rev, str) and canonical_rev_rx.match(rev):
+    rev = str(rev)
+    if rev_rx.match(rev):
       return rev
     else:
       cmd = [GIT, 'rev-parse', rev]
-      return self._command(cmd)
+      return self._command(cmd).decode().rstrip()
 
   def ls(self, rev, path, recursive=False, recursive_dirs=False,
          directory=False, report=()):
@@ -121,17 +100,17 @@ class GitRepo(VCSRepo):
       if directory:
         entry = attrdict(path='/', type='d')
         if 'commit' in report:
-          cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev]
-          entry.commit = self._command(cmd)
+          entry.commit = self.canonical_rev(rev)
         return [entry]
     else:
-      cmd = [GIT, 'ls-tree', '-z', rev, '--', path.rstrip('/')]
+      epath = path.rstrip('/').encode(self.encoding)
+      cmd = [GIT, 'ls-tree', '-z', rev, '--', epath]
       output = self._command(cmd)
-      output = output.rstrip('\0')
-      m = ls_tree_rx.match(output)
-      if not m:
+      if not output:
         raise PathDoesNotExist(rev, path)
-      if m.group('type') == 'tree':
+      meta, ename = output.split(b'\t', 1)
+      meta = meta.decode().split()
+      if meta[1] == 'tree':
         if not (directory or path.endswith('/')):
           path = path + '/'
       elif forcedir:
@@ -144,24 +123,26 @@ class GitRepo(VCSRepo):
         cmd.append('-t')
     if 'size' in report:
       cmd.append('-l')
-    cmd.extend([rev, '--', path])
-    output = self._command(cmd).rstrip('\0')
+    epath = path.encode(self.encoding)
+    cmd.extend([rev, '--', epath])
+    output = self._command(cmd).rstrip(b'\0')
     if not output:
       return []
 
     results = []
-    for line in output.split('\0'):
-      m = ls_tree_rx.match(line)
-      assert m, 'unexpected output: ' + line
-      mode, name, objid = m.group('mode', 'name', 'object')
+    for line in output.split(b'\0'):
+      meta, ename = line.split(b'\t', 1)
+      meta = meta.decode().split()
+      mode = int(meta[0], 8)
+      objid = meta[2]
+      name = ename.decode(self.encoding, 'replace')
       if recursive_dirs and path == name + '/':
         continue
-      assert name.startswith(path), 'unexpected output: ' + line
+      assert name.startswith(path), 'unexpected output: ' + str(line)
       entry = attrdict(path=name)
       entry_name = name[ltrim:].lstrip('/')
       if entry_name:
         entry.name = entry_name
-      mode = int(mode, 8)
       if stat.S_ISDIR(mode):
         entry.type = 'd'
       elif stat.S_ISREG(mode):
@@ -169,26 +150,29 @@ class GitRepo(VCSRepo):
         if 'executable' in report:
           entry.executable = bool(mode & stat.S_IXUSR)
         if 'size' in report:
-          entry.size = int(m.group('size'))
+          entry.size = int(meta[3])
       elif stat.S_ISLNK(mode):
         entry.type = 'l'
         if 'target' in report:
-          entry.target = self._readlink(rev, name)
+          entry.target = self._cat(rev, ename).decode(self.encoding, 'replace')
       else:
-        assert False, 'unexpected output: ' + line
+        assert False, 'unexpected output: ' + str(line)
       if 'commit' in report:
         try:
           entry.commit = self._object_cache[objid]
+          entry._commit_cached = True
         except KeyError:
-          cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', name]
-          commit = str(self._command(cmd))
+          ename = name.encode(self.encoding)
+          cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
+          commit = self._command(cmd).decode()
           entry.commit = self._object_cache[objid] = commit
       results.append(entry)
 
     return results
 
   def _cat(self, rev, path):
-    cmd = [GIT, 'cat-file', 'blob', '%s:%s' % (rev, path)]
+    rp = rev.encode('ascii') + b':' + path
+    cmd = [GIT, 'cat-file', 'blob', rp]
     return self._command(cmd)
 
   def cat(self, rev, path):
@@ -197,11 +181,8 @@ class GitRepo(VCSRepo):
     assert len(ls) == 1
     if ls[0].get('type') != 'f':
       raise BadFileType(rev, path)
-    return self._cat(rev, path)
-
-  def _readlink(self, rev, path):
-    cmd = [GIT, 'cat-file', 'blob', '%s:%s' % (rev, path)]
-    return self._command(cmd)
+    epath = path.encode(self.encoding, 'strict')
+    return self._cat(rev, epath)
 
   def readlink(self, rev, path):
     path = type(self).cleanPath(path)
@@ -209,21 +190,22 @@ class GitRepo(VCSRepo):
     assert len(ls) == 1
     if ls[0].get('type') != 'l':
       raise BadFileType(rev, path)
-    return self._readlink(rev, path)
+    epath = path.encode(self.encoding, 'strict')
+    return self._cat(rev, epath).decode(self.encoding, 'replace')
 
   def branches(self):
     cmd = [GIT, 'branch']
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     results = []
     for line in output.splitlines():
       m = branch_rx.match(line)
-      assert m, 'unexpected output: ' + line
+      assert m, 'unexpected output: ' + str(line)
       results.append(m.group('name'))
     return results
 
   def tags(self):
     cmd = [GIT, 'tag']
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     return output.splitlines()
 
   def heads(self):
@@ -252,7 +234,7 @@ class GitRepo(VCSRepo):
 
   def log(self, revrange=None, limit=None, firstparent=False, merges=None,
           path=None, follow=False):
-    cmd = [GIT, 'log', '-z', '--pretty=format:%H%n%P%n%ai%n%an <%ae>%n%B']
+    cmd = [GIT, 'log', '-z', '--pretty=format:%H%n%P%n%ai%n%an <%ae>%n%B', '--encoding=none']
     if limit is not None:
       cmd.append('-' + str(limit))
     if firstparent:
@@ -283,6 +265,7 @@ class GitRepo(VCSRepo):
     else:
       entry = self._commit_cache.get(self.canonical_rev(revrange))
       if entry:
+        entry._cached = True
         return entry
       cmd.extend(['-1', revrange])
       single = True
@@ -290,7 +273,7 @@ class GitRepo(VCSRepo):
       if follow:
         cmd.append('--follow')
       cmd.extend(['--', type(self).cleanPath(path)])
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
 
     results = []
     for log in output.split('\0'):
@@ -306,12 +289,16 @@ class GitRepo(VCSRepo):
     return results
 
   def changed(self, rev):
-    cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-c', '--first-parent', '--root', rev]
+    cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--first-parent', '--root', rev]
     output = self._command(cmd)
     results = []
-    for m in diff_tree_rx.finditer(output):
-      status, src_path, dst_path = m.group('status', 'src_path', 'dst_path')
-      if dst_path:
+    for line in output.rstrip(b'\0').split(b'\0:')[1:]:
+      path = line.split(b'\0')
+      meta = path.pop(0).split()
+      status = meta[3].decode()[0]
+      src_path = path[0].decode(self.encoding, 'replace')
+      if len(path) == 2:
+        dst_path = path[1].decode(self.encoding, 'replace')
         entry = FileChangeInfo(dst_path, str(status), src_path)
       else:
         entry = FileChangeInfo(src_path, str(status))
@@ -319,7 +306,7 @@ class GitRepo(VCSRepo):
     return results
 
   def pdiff(self, rev):
-    cmd = [GIT, 'diff-tree', '-p', '-r', '-c', '--first-parent', '--root', rev]
+    cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--first-parent', '--root', rev]
     return self._command(cmd)
 
   def diff(self, rev_a, rev_b, path=None):
@@ -340,14 +327,19 @@ class GitRepo(VCSRepo):
     else:
       raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
-  def _blame(self, rev, path):
-    cmd = [GIT, 'blame', '--root', '-p', rev, '--', path]
+  def blame(self, rev, path):
+    path = type(self).cleanPath(path)
+    ls = self.ls(rev, path, directory=True)
+    assert len(ls) == 1
+    if ls[0].get('type') != 'f':
+      raise BadFileType(rev, path)
+    cmd = [GIT, 'blame', '--root', '--encoding=none', '-p', rev, '--', path]
     output = self._command(cmd)
     rev = None
     revinfo = {}
     results = []
     for line in output.splitlines():
-      if line.startswith('\t'):
+      if line.startswith(b'\t'):
         ri = revinfo[rev]
         author = ri['author'] + ' ' + ri['author-mail']
         ts = int(ri['author-time'])
@@ -356,17 +348,9 @@ class GitRepo(VCSRepo):
         entry = BlameInfo(rev, author, date, line[1:])
         results.append(entry)
       else:
-        k, v = line.split(None, 1)
+        k, v = line.decode(self.encoding, 'replace').split(None, 1)
         if rev_rx.match(k):
           rev = k
         else:
           revinfo.setdefault(rev, {})[k] = v
     return results
-
-  def blame(self, rev, path):
-    path = type(self).cleanPath(path)
-    ls = self.ls(rev, path, directory=True)
-    assert len(ls) == 1
-    if ls[0].get('type') != 'f':
-      raise BadFileType(rev, path)
-    return self._blame(rev, path)
