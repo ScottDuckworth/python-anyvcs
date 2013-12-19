@@ -1,6 +1,22 @@
 Release Notes for python-anyvcs
 ===============================
 
+1.3.0 (2013-12-19)
+------------------
+
+* Proper handling of encodings; encoding is now an attribute of VCSRepo
+  instances and defaults to UTF-8
+* Begin preparing for Sphinx documentation generation
+* Better behavior for GitRepo.pdiff() and .changed()
+* Fix GitRepo.canonical_rev() and add regression tests
+
+1.2.3 (2013-12-16)
+------------------
+
+* Change to BSD 3-clause license
+* Slightly better behavior for GitRepo.pdiff() and .changed()
+* Clear up specification for empty() and __len__()
+
 1.2.2 (2013-11-14)
 ------------------
 
