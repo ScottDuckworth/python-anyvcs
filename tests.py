@@ -947,7 +947,7 @@ class GitLikeBasicTest(BasicTest):
     self.assertEqual(self.rev1, result[0].rev)
     self.assertEqual('Test User <me@example.com>', result[0].author)
     self.assertIsInstance(result[0].date, datetime.datetime)
-    self.assertEqual('Pisgah', result[0].line)
+    self.assertEqual('Pisgah'.encode(), result[0].line)
 
 class GitBasicTest(GitTest, GitLikeBasicTest):
   def test_branches(self):

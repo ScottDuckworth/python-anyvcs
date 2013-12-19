@@ -96,7 +96,7 @@ class HgRepo(VCSRepo):
       return rev
     else:
       cmd = [HG, 'log', '--template={node}', '-r', str(rev)]
-      return self._command(cmd)
+      return self._command(cmd).decode()
 
   def _revnum(self, rev):
     if isinstance(rev, int):
@@ -120,7 +120,7 @@ class HgRepo(VCSRepo):
       ltrim = len(path) + 1
       prefix = path + '/'
     cmd = [HG, 'manifest', '--debug', '-r', rev]
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     if not output:
       return
 
@@ -187,7 +187,7 @@ class HgRepo(VCSRepo):
             ).encode())
             style.flush()
             cmd = [HG, 'log', '--style', style.name, '-r', '%d:' % startlog]
-            output = self._command(cmd)
+            output = self._command(cmd).decode(self.encoding, 'replace')
             files_cache.write(output)
             extend = output.split('\0')
             assert extend.pop() == ''
@@ -210,7 +210,7 @@ class HgRepo(VCSRepo):
       elif t == '@':
         entry.type = 'l'
         if 'target' in report:
-          entry.target = self._cat(revstr, name)
+          entry.target = self._cat(revstr, name).decode(self.encoding, 'replace')
       else:
         assert False, 'unexpected output: ' + line
       if 'commit' in report:
@@ -275,10 +275,10 @@ class HgRepo(VCSRepo):
     assert len(ls) == 1
     if ls[0].get('type') != 'l':
       raise BadFileType(rev, path)
-    return self._cat(str(rev), path)
+    return self._cat(str(rev), path).decode(self.encoding, 'replace')
 
   def _parse_heads(self, cmd):
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     results = []
     for line in output.splitlines():
       m = parse_heads_rx.match(line)
@@ -297,7 +297,7 @@ class HgRepo(VCSRepo):
   def bookmarks(self):
     """Get list of bookmarks"""
     cmd = [HG, 'bookmarks']
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     if output.startswith('no bookmarks set'):
       return []
     results = []
@@ -313,7 +313,7 @@ class HgRepo(VCSRepo):
   def empty(self):
     cmd = [HG, 'log', '--template=a', '-l1']
     output = self._command(cmd)
-    return output == ''
+    return len(output) == 0
 
   def __contains__(self, rev):
     cmd = [HG, 'log', '--template=a', '-r', str(rev)]
@@ -364,7 +364,7 @@ class HgRepo(VCSRepo):
       if follow:
         cmd.append('--follow')
       cmd.extend(['--', type(self).cleanPath(path)])
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
 
     results = []
     logs = output.split('\0\0')
@@ -385,7 +385,7 @@ class HgRepo(VCSRepo):
 
   def changed(self, rev):
     cmd = [HG, 'status', '-C', '--change', str(rev)]
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     results = []
     copy = None
     for line in reversed(output.splitlines()):
@@ -403,10 +403,6 @@ class HgRepo(VCSRepo):
     cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
     return self._command(cmd)[1:]
 
-  def pdiff(self, rev):
-    cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
-    return self._command(cmd)[1:]
-
   def diff(self, rev_a, rev_b, path=None):
     cmd = [HG, 'diff', '-r', rev_a, '-r', rev_b]
     if path is not None:
@@ -415,7 +411,7 @@ class HgRepo(VCSRepo):
 
   def ancestor(self, rev1, rev2):
     cmd = [HG, 'log', '--template={node}', '-r', 'ancestor(%s, %s)' % (rev1, rev2)]
-    output = self._command(cmd)
+    output = self._command(cmd).decode()
     if output == '':
       return None
     else:
@@ -423,7 +419,7 @@ class HgRepo(VCSRepo):
 
   def _blame(self, rev, path):
     cmd = [HG, 'annotate', '-unv', '-r', rev, '--', path]
-    output = self._command(cmd)
+    output = self._command(cmd).decode(self.encoding, 'replace')
     revs = {}
     results = []
     cat = self._cat(rev, path)
@@ -435,7 +431,8 @@ class HgRepo(VCSRepo):
         rev, date = revs[rev]
       except KeyError:
         cmd = [HG, 'log', '--template={node}\n{date|hgdate}', '-r', rev]
-        rev, date = self._command(cmd).split('\n', 1)
+        output = self._command(cmd).decode(self.encoding, 'replace')
+        rev, date = output.split('\n', 1)
         date = parse_hgdate(date)
         revs[rev] = rev, date
       results.append(BlameInfo(rev, author, date, text))
