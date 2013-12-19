@@ -1938,6 +1938,45 @@ class SvnBranchTestStep13(SvnTest, BranchTestStep13):
     correct = [15, 11, 4]
     self.assertEqual(correct, result)
 
+### TEST CASE: CacheTest ###
+
+class CacheTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    with open(os.path.join(working_path, 'a'), 'w') as f:
+      f.write('spoon')
+    yield Commit('modify a')
+    cls.rev1 = cls.getAbsoluteRev()
+
+  def test_log_head(self):
+    for i in range(2):
+      result = self.repo.log(revrange=self.main_branch)
+      self.assertIsInstance(result, CommitLogEntry)
+      self.assertEqual(self.rev1, result.rev)
+      self.assertIsInstance(result.date, datetime.datetime)
+    self.assertTrue(result._cached)
+
+class GitLikeCacheTest(CacheTest):
+  def test_ls(self):
+    correct = [{'path':'a', 'name':'a', 'type':'f', 'commit':self.rev1}]
+    for i in range(2):
+      result = self.repo.ls(self.main_branch, '/', report=['commit'])
+      self.assertEqual(correct, result)
+    self.assertTrue(result[0]._commit_cached)
+
+class GitCacheTest(GitTest, GitLikeCacheTest): pass
+class HgCacheTest(HgTest, GitLikeCacheTest): pass
+class SvnCacheTest(SvnTest, CacheTest):
+  def test_log_all(self):
+    for i in range(2):
+      result = self.repo.log()
+      self.assertIsInstance(result, list)
+      self.assertEqual(2, len(result))
+      self.assertIsInstance(result[0], CommitLogEntry)
+      self.assertEqual(self.rev1, result[0].rev)
+      self.assertIsInstance(result[0].date, datetime.datetime)
+    self.assertTrue(result[0]._cached)
+
 
 if __name__ == '__main__':
   unittest.main()

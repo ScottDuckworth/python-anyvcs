@@ -109,7 +109,10 @@ class attrdict(dict):
   def __getattr__(self, name):
     return self.__getitem__(name)
   def __setattr__(self, name, value):
-    self.__setitem__(name, value)
+    if name.startswith('_'):
+      dict.__setattr__(self, name, value)
+    else:
+      self.__setitem__(name, value)
   def __delattr__(self, name):
     self.__delitem__(name)
 

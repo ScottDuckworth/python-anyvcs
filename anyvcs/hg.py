@@ -218,6 +218,7 @@ class HgRepo(VCSRepo):
         if objid:
           try:
             entry.commit = self._object_cache[objid]
+            entry._commit_cached = True
             lookup = False
           except KeyError:
             pass
@@ -357,6 +358,7 @@ class HgRepo(VCSRepo):
     else:
       entry = self._commit_cache.get(self.canonical_rev(revrange))
       if entry:
+        entry._cached = True
         return entry
       cmd.extend(['-r', str(revrange)])
       single = True

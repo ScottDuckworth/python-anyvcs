@@ -404,6 +404,7 @@ class SvnRepo(VCSRepo):
     cachekey = hashlib.sha1(revstr.encode()).hexdigest()
     entry = self._commit_cache.get(cachekey)
     if entry:
+      entry._cached = True
       return entry
     output = self._command(cmd).decode(self.encoding, 'replace')
     author, date, logsize, message = output.split('\n', 3)

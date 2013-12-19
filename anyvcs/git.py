@@ -160,6 +160,7 @@ class GitRepo(VCSRepo):
       if 'commit' in report:
         try:
           entry.commit = self._object_cache[objid]
+          entry._commit_cached = True
         except KeyError:
           ename = name.encode(self.encoding)
           cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
@@ -264,6 +265,7 @@ class GitRepo(VCSRepo):
     else:
       entry = self._commit_cache.get(self.canonical_rev(revrange))
       if entry:
+        entry._cached = True
         return entry
       cmd.extend(['-1', revrange])
       single = True
