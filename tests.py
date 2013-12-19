@@ -1031,7 +1031,7 @@ class SvnBasicTest(SvnTest, BasicTest):
     self.assertEqual(self.rev1, result[0].rev)
     self.assertEqual(getpass.getuser(), result[0].author)
     self.assertIsInstance(result[0].date, datetime.datetime)
-    self.assertEqual('Pisgah', result[0].line)
+    self.assertEqual('Pisgah'.encode(), result[0].line)
 
 ### TEST CASE: UnrelatedBranchTest ###
 
