@@ -2045,13 +2045,12 @@ class Latin1EncodingTest(object):
     result = self.repo.log(revrange=self.main_branch)
     self.assertEqual(correct, result.message.rstrip())
 
-class GitLatin1EncodingTest(GitTest, Latin1EncodingTest): pass
-
-if os.getenv('HGENCODING') and os.getenv('HGENCODING').lower() == 'latin1':
-  class HgLatin1EncodingTest(HgTest, Latin1EncodingTest): pass
-
-# By default, Subversion only allows UTF-8 strings in commits so we'll skip
-# this test.
+# Don't do these tests for now because many systems won't have the latin1
+# locale and the tests will fail.  Also, Mercurial and Subversion will fail
+# by default if you give them non-UTF-8 strings.
+#
+#class GitLatin1EncodingTest(GitTest, Latin1EncodingTest): pass
+#class HgLatin1EncodingTest(HgTest, Latin1EncodingTest): pass
 #class SvnLatin1EncodingTest(SvnTest, Latin1EncodingTest): pass
 
 
