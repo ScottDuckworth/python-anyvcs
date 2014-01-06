@@ -40,16 +40,19 @@ parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f
 bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 annotate_rx = re.compile(r'^(?P<author>.*)\s+(?P<rev>\d+):\s')
 
+
 def parent_dirs(path):
     ds = path.find('/')
     while ds != -1:
         yield path[:ds]
         ds = path.find('/', ds + 1)
 
+
 def parse_hgdate(datestr):
     ts, tzoffset = datestr.split(None, 1)
     date = datetime.datetime.fromtimestamp(float(ts))
-    return date.replace(tzinfo=UTCOffset(-int(tzoffset)/60))
+    return date.replace(tzinfo=UTCOffset(-int(tzoffset) / 60))
+
 
 class HgRepo(VCSRepo):
     """A Mercurial repository
@@ -107,8 +110,9 @@ class HgRepo(VCSRepo):
             cmd = [HG, 'log', '--template={rev}', '-r', str(rev)]
             return int(self._command(cmd))
 
-    def _ls(self, rev, path, recursive=False, recursive_dirs=False,
-                    directory=False):
+    def _ls(
+        self, rev, path, recursive=False, recursive_dirs=False, directory=False
+    ):
         forcedir = False
         if path.endswith('/'):
             forcedir = True
@@ -142,19 +146,21 @@ class HgRepo(VCSRepo):
                         d = next(p)
                         if d not in dirs:
                             dirs.add(d)
-                            yield ('d', prefix+d, d, None)
+                            yield ('d', prefix + d, d, None)
                         continue
                     if recursive_dirs:
                         for d in p:
                             if d not in dirs:
                                 dirs.add(d)
-                                yield ('d', prefix+d, d, None)
+                                yield ('d', prefix + d, d, None)
                 yield (t, name, entry_name, objid)
         if not exists:
             raise PathDoesNotExist(rev, path)
 
-    def ls(self, rev, path, recursive=False, recursive_dirs=False,
-                 directory=False, report=()):
+    def ls(
+        self, rev, path, recursive=False, recursive_dirs=False,
+        directory=False, report=()
+    ):
         revstr = str(rev)
         path = type(self).cleanPath(path)
         if path == '':
@@ -165,7 +171,8 @@ class HgRepo(VCSRepo):
                 return [entry]
 
         if 'commit' in report:
-            import fcntl, tempfile
+            import fcntl
+            import tempfile
             files_cache_path = os.path.join(self.private_path, 'files-cache.log')
             with open(files_cache_path, 'a+') as files_cache:
                 fcntl.lockf(files_cache, fcntl.LOCK_EX, 0, 0, os.SEEK_CUR)
@@ -318,8 +325,9 @@ class HgRepo(VCSRepo):
 
     def __contains__(self, rev):
         cmd = [HG, 'log', '--template=a', '-r', str(rev)]
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         return p.returncode == 0
 
@@ -328,10 +336,14 @@ class HgRepo(VCSRepo):
         output = self._command(cmd)
         return int(output) + 1
 
-    def log(self, revrange=None, limit=None, firstparent=False, merges=None,
-                    path=None, follow=False):
-        cmd = [HG, 'log', '--debug', '--template={node}\\0{parents}\\0'
-                     '{date|hgdate}\\0{author|nonempty}\\0{desc|tabindent|nonempty}\\0\\0']
+    def log(
+        self, revrange=None, limit=None, firstparent=False, merges=None,
+        path=None, follow=False
+    ):
+        cmd = [
+            HG, 'log', '--debug', '--template={node}\\0{parents}\\0'
+            '{date|hgdate}\\0{author|nonempty}'
+            '\\0{desc|tabindent|nonempty}\\0\\0']
         if limit is not None:
             cmd.append('-l' + str(limit))
         if firstparent:
@@ -373,8 +385,12 @@ class HgRepo(VCSRepo):
         logs.pop()
         for log in logs:
             rev, parents, date, author, message = log.split('\0', 4)
-            parents = [x[1] for x in filter(lambda x: x[0] != '-1',
-                (x.split(':') for x in parents.split()))]
+            parents = [
+                x[1] for x in filter(
+                    lambda x: x[0] != '-1',
+                    (x.split(':') for x in parents.split())
+                )
+            ]
             date = parse_hgdate(date)
             message = message.replace('\n\t', '\n')
             entry = CommitLogEntry(rev, parents, date, author, message)

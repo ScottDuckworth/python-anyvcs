@@ -39,6 +39,7 @@ multislash_rx = re.compile(r'//+')
 isodate_rx = re.compile(r'(?P<year>\d{4})-?(?P<month>\d{2})-?(?P<day>\d{2})(?:\s*(?:T\s*)?(?P<hour>\d{2})(?::?(?P<minute>\d{2})(?::?(?P<second>\d{2}))?)?(?:[,.](?P<fraction>\d+))?(?:\s*(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?)))?)')
 tz_rx = re.compile(r'^(?P<tz>(?:Z|[+-](?P<tzhh>\d{2})(?::?(?P<tzmm>\d{2}))?))$')
 
+
 def parse_isodate(datestr):
     """Parse a string that loosely fits ISO 8601 formatted date-time string
     """
@@ -70,6 +71,7 @@ def parse_isodate(datestr):
         dt = dt.replace(tzinfo=UTCOffset(offset))
     return dt
 
+
 class ABCMetaDocStringInheritor(ABCMeta):
     '''A variation on
     http://groups.google.com/group/comp.lang.python/msg/26f7b4fcb4d66c95
@@ -84,37 +86,47 @@ class ABCMetaDocStringInheritor(ABCMeta):
                     break
         for attr, attribute in clsdict.items():
             if not attribute.__doc__:
-                for mro_cls in (mro_cls for base in bases for mro_cls in base.mro()
-                                                if hasattr(mro_cls, attr)):
-                    doc=getattr(getattr(mro_cls, attr), '__doc__')
+                for mro_cls in (
+                    mro_cls for base in bases for mro_cls in base.mro()
+                    if hasattr(mro_cls, attr)
+                ):
+                    doc = getattr(getattr(mro_cls, attr), '__doc__')
                     if doc:
                         attribute.__doc__ = doc
                         break
         return ABCMeta.__new__(meta, name, bases, clsdict)
 
+
 class UnknownVCSType(Exception):
     pass
+
 
 class RevisionPathException(Exception):
     def __init__(self, rev, path):
         super(RevisionPathException, self).__init__(rev, path)
 
+
 class PathDoesNotExist(RevisionPathException):
     pass
+
 
 class BadFileType(RevisionPathException):
     pass
 
+
 class attrdict(dict):
     def __getattr__(self, name):
         return self.__getitem__(name)
+
     def __setattr__(self, name, value):
         if name.startswith('_'):
             dict.__setattr__(self, name, value)
         else:
             self.__setitem__(name, value)
+
     def __delattr__(self, name):
         self.__delitem__(name)
+
 
 class CommitLogEntry(object):
     def __init__(self, rev, parents, date, author, message):
@@ -150,12 +162,13 @@ class CommitLogEntry(object):
         if o.get('v') != 1:
             return None
         return cls(
-            rev = o['r'],
-            parents = o['p'],
-            date = parse_isodate(o['d']),
-            author = o['a'],
-            message = o['m'],
+            rev=o['r'],
+            parents=o['p'],
+            date=parse_isodate(o['d']),
+            author=o['a'],
+            message=o['m'],
         )
+
 
 class CommitLogCache(HashDict):
     def __getitem__(self, key):
@@ -169,11 +182,13 @@ class CommitLogCache(HashDict):
         value = value.to_json()
         HashDict.__setitem__(self, key, value)
 
+
 class FileChangeInfo(object):
     def __init__(self, path, status, copy=None):
         self.path = path
         self.status = status
         self.copy = copy
+
 
 class BlameInfo(object):
     def __init__(self, rev, author, date, line):
@@ -181,6 +196,7 @@ class BlameInfo(object):
         self.author = author
         self.date = date
         self.line = line
+
 
 class UTCOffset(datetime.tzinfo):
     ZERO = datetime.timedelta()
@@ -201,9 +217,9 @@ class UTCOffset(datetime.tzinfo):
         if name is not None:
             self.name = name
         elif self.offset < type(self).ZERO:
-            self.name = '-%02d%02d' % divmod((-self.offset).seconds/60, 60)
+            self.name = '-%02d%02d' % divmod((-self.offset).seconds / 60, 60)
         else:
-            self.name = '+%02d%02d' % divmod(self.offset.seconds/60, 60)
+            self.name = '+%02d%02d' % divmod(self.offset.seconds / 60, 60)
 
     def utcoffset(self, dt):
         return self.offset
@@ -213,6 +229,7 @@ class UTCOffset(datetime.tzinfo):
 
     def tzname(self, dt):
         return self.name
+
 
 class VCSRepo(object):
     __metaclass__ = ABCMetaDocStringInheritor
@@ -246,7 +263,7 @@ class VCSRepo(object):
         try:
             output = subprocess.check_output(cmd, **kwargs)
             return output
-        except AttributeError: # subprocess.check_output added in python 2.7
+        except AttributeError:  # subprocess.check_output added in python 2.7
             kwargs.setdefault('stdout', subprocess.PIPE)
             p = subprocess.Popen(cmd, **kwargs)
             stdout, stderr = p.communicate()
@@ -266,8 +283,10 @@ class VCSRepo(object):
         raise NotImplementedError
 
     @abstractmethod
-    def ls(self, rev, path, recursive=False, recursive_dirs=False,
-                 directory=False, report=()):
+    def ls(
+        self, rev, path, recursive=False, recursive_dirs=False,
+        directory=False, report=()
+    ):
         """List directory or file
 
         :param rev: The revision to use.
@@ -374,8 +393,10 @@ class VCSRepo(object):
         return NotImplementedError
 
     @abstractmethod
-    def log(self, revrange=None, limit=None, firstparent=False, merges=None,
-                    path=None, follow=False):
+    def log(
+        self, revrange=None, limit=None, firstparent=False, merges=None,
+        path=None, follow=False
+    ):
         """Get commit logs
 
         :param revrange: Either a single revision or a range of revisions as a 2

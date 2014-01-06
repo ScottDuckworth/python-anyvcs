@@ -44,6 +44,7 @@ changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)\)$')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
+
 class SvnRepo(VCSRepo):
     """A Subversion repository
 
@@ -189,8 +190,10 @@ class SvnRepo(VCSRepo):
             rev, prefix = self._maprev(rev)
             return rev
 
-    def ls(self, rev, path, recursive=False, recursive_dirs=False,
-                 directory=False, report=()):
+    def ls(
+        self, rev, path, recursive=False, recursive_dirs=False,
+        directory=False, report=()
+    ):
         rev, prefix = self._maprev(rev)
         revstr = str(rev)
         path = type(self).cleanPath(prefix + path)
@@ -215,8 +218,10 @@ class SvnRepo(VCSRepo):
         if not recursive:
             cmd.append('--non-recursive')
         cmd.extend(['.', path])
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         output, stderr = p.communicate()
         if p.returncode != 0:
             stderr = stderr.decode()
@@ -303,6 +308,7 @@ class SvnRepo(VCSRepo):
                 n = n.setdefault(p, {})
         youngest = self.youngest()
         results = []
+
         def match(n, path):
             for d in self.ls(youngest, path):
                 if d.get('type') == 'd':
@@ -336,8 +342,10 @@ class SvnRepo(VCSRepo):
     def __contains__(self, rev):
         rev, prefix = self._maprev(rev)
         cmd = [SVNLOOK, 'history', '.', prefix, '-l1', '-r', str(rev)]
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         return p.returncode == 0
 
@@ -346,8 +354,10 @@ class SvnRepo(VCSRepo):
         output = self._command(cmd)
         return len(output.splitlines()) - 3
 
-    def log(self, revrange=None, limit=None, firstparent=False, merges=None,
-                    path=None, follow=False):
+    def log(
+        self, revrange=None, limit=None, firstparent=False, merges=None,
+        path=None, follow=False
+    ):
         if not (revrange is None or isinstance(revrange, (tuple, list))):
             # a single revision was given
             rev, prefix = self._maprev(revrange)
@@ -447,7 +457,10 @@ class SvnRepo(VCSRepo):
         return output
 
     def diff(self, rev_a, rev_b, path=None):
-        import os, shutil, tempfile
+        import os
+        import shutil
+        import tempfile
+
         rev_a, prefix_a = self._maprev(rev_a)
         rev_b, prefix_b = self._maprev(rev_b)
         tmpdir = tempfile.mkdtemp(prefix='anyvcs-svn-diff.')
@@ -589,7 +602,7 @@ class SvnRepo(VCSRepo):
         target = tree.find('target')
         try:
             iter = target.iter('entry')
-        except AttributeError: # added in python 2.7
+        except AttributeError:  # added in python 2.7
             iter = target.getiterator('entry')
         for entry, text in zip(iter, cat.splitlines()):
             commit = entry.find('commit')
@@ -609,8 +622,10 @@ class SvnRepo(VCSRepo):
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
 
-    def dump(self, stream, progress=None, lower=None, upper=None,
-                     incremental=False, deltas=False):
+    def dump(
+        self, stream, progress=None, lower=None, upper=None,
+        incremental=False, deltas=False
+    ):
         """Dump the repository to a dumpfile stream.
 
         :param stream: A file stream to which the dumpfile is written
@@ -639,9 +654,10 @@ class SvnRepo(VCSRepo):
         if p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, cmd)
 
-    def load(self, stream, progress=None, ignore_uuid=False, force_uuid=False,
-                     use_pre_commit_hook=False, use_post_commit_hook=False,
-                     parent_dir=None):
+    def load(
+        self, stream, progress=None, ignore_uuid=False, force_uuid=False,
+        use_pre_commit_hook=False, use_post_commit_hook=False, parent_dir=None
+    ):
         """Load a dumpfile stream into the repository.
 
         :param stream: A file stream from which the dumpfile is read
@@ -663,8 +679,10 @@ class SvnRepo(VCSRepo):
             cmd.append('--use-post-commit-hook')
         if parent_dir:
             cmd.extend(['--parent-dir', parent_dir])
-        p = subprocess.Popen(cmd, cwd=self.path, stdin=stream,
-                                                 stdout=progress, stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdin=stream, stdout=progress,
+            stderr=subprocess.PIPE
+        )
         stderr = p.stderr.read()
         p.wait()
         if p.returncode != 0:

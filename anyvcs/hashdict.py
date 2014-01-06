@@ -31,6 +31,7 @@ import errno
 import fcntl
 import os
 
+
 class HashDict(collections.MutableMapping):
     """A dictionary-like object for hex keys and string values that is stored
     on-disk and is multi-process safe.
@@ -91,7 +92,7 @@ class HashDict(collections.MutableMapping):
         try:
             os.unlink(p)
         except OSError as e:
-            if e.errno == ENOENT:
+            if e.errno == errno.ENOENT:
                 raise KeyError(key)
             raise
 

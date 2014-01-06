@@ -38,6 +38,7 @@ GIT = 'git'
 rev_rx = re.compile(r'^[0-9a-f]{40}$', re.IGNORECASE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 
+
 class GitRepo(VCSRepo):
     """A git repository
 
@@ -86,8 +87,10 @@ class GitRepo(VCSRepo):
             cmd = [GIT, 'rev-parse', rev]
             return self._command(cmd).decode().rstrip()
 
-    def ls(self, rev, path, recursive=False, recursive_dirs=False,
-                 directory=False, report=()):
+    def ls(
+        self, rev, path, recursive=False, recursive_dirs=False,
+        directory=False, report=()
+    ):
         path = type(self).cleanPath(path)
         forcedir = False
         if path.endswith('/'):
@@ -213,27 +216,33 @@ class GitRepo(VCSRepo):
 
     def empty(self):
         cmd = [GIT, 'rev-parse', 'HEAD']
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         return not rev_rx.match(stdout.decode())
 
     def __contains__(self, rev):
         cmd = [GIT, 'rev-list', '-n', '1', rev]
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         return p.returncode == 0
 
     def __len__(self):
         cmd = [GIT, 'rev-list', '--all']
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         return len(stdout.splitlines())
 
-    def log(self, revrange=None, limit=None, firstparent=False, merges=None,
-                    path=None, follow=False):
+    def log(
+        self, revrange=None, limit=None, firstparent=False, merges=None,
+        path=None, follow=False
+    ):
         cmd = [GIT, 'log', '-z', '--pretty=format:%H%n%P%n%ai%n%an <%ae>%n%B', '--encoding=none']
         if limit is not None:
             cmd.append('-' + str(limit))
@@ -317,8 +326,9 @@ class GitRepo(VCSRepo):
 
     def ancestor(self, rev1, rev2):
         cmd = [GIT, 'merge-base', rev1, rev2]
-        p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = p.communicate()
         if p.returncode == 0:
             return stdout.decode().rstrip()
