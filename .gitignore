@@ -1,2 +1,4 @@
 *.py[coa]
 /anyvcs.egg-info
+
+doc/_build
