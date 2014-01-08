@@ -2053,6 +2053,50 @@ class Latin1EncodingTest(object):
 #class HgLatin1EncodingTest(HgTest, Latin1EncodingTest): pass
 #class SvnLatin1EncodingTest(SvnTest, Latin1EncodingTest): pass
 
+### TEST CASE: CopyTest ###
+
+class CopyTest(object):
+  @classmethod
+  def setUpWorkingCopy(cls, working_path):
+    with open(os.path.join(working_path, 'main'), 'w') as f:
+      f.write('Sherlock')
+    yield Commit('1: create main')
+    cls.rev1 = cls.getAbsoluteRev()
+    with open(os.path.join(working_path, 'copy'), 'w') as f:
+      f.write('Sherlock')
+    yield Commit('2: create copy')
+    cls.rev2 = cls.getAbsoluteRev()
+
+  def test_log1(self):
+    result = self.repo.log(limit=1, path='/main')[0].rev
+    self.assertEqual(self.rev1, result)
+    result = self.repo.log(limit=1, path='/copy')[0].rev
+    self.assertEqual(self.rev2, result)
+  
+  def test_log2(self):
+    result = self.repo.log(revrange=self.rev1, path='/main').rev
+    self.assertEqual(self.rev1, result)
+    result = self.repo.log(revrange=self.rev2, path='/copy').rev
+    self.assertEqual(self.rev2, result)
+
+  def test_ls1(self):
+    result = self.repo.ls(self.rev1, '/main',
+                          directory=True,
+                          report=['commit'])[0].commit
+    self.assertEqual(self.rev1, result)
+    result = self.repo.ls(self.rev2, '/copy',
+                          directory=True,
+                          report=['commit'])[0].commit
+    self.assertEqual(self.rev2, result)
+
+class GitCopyTest(GitTest, CopyTest):
+  pass
+
+class SvnCopyTest(SvnTest, CopyTest):
+  pass
+
+class HgCopyTest(HgTest, CopyTest):
+  pass
 
 if __name__ == '__main__':
   unittest.main()
