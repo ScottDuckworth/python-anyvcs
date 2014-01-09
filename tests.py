@@ -2058,45 +2058,60 @@ class Latin1EncodingTest(object):
 class CopyTest(object):
   @classmethod
   def setUpWorkingCopy(cls, working_path):
+    # initial copy of file created
     with open(os.path.join(working_path, 'main'), 'w') as f:
       f.write('Sherlock')
     yield Commit('1: create main')
     cls.rev1 = cls.getAbsoluteRev()
+
+    # file with identical contents named 'copy'
     with open(os.path.join(working_path, 'copy'), 'w') as f:
       f.write('Sherlock')
     yield Commit('2: create copy')
     cls.rev2 = cls.getAbsoluteRev()
+
+    # similar file which has been changed and reverted
+    p = os.path.join(working_path, 'revert')
+    with open(p, 'w') as f:
+      f.write('Sherlock')
+    yield Commit('3: create revert')
+    cls.rev3 = cls.getAbsoluteRev()
+    with open(p, 'w') as f:
+      f.write('Watson')
+    yield Commit('4: change revert')
+    cls.rev4 = cls.getAbsoluteRev()
+    with open(p, 'w') as f:
+      f.write('Sherlock')
+    yield Commit('5: revert revert')
+    cls.rev5 = cls.getAbsoluteRev()
 
   def test_log1(self):
     result = self.repo.log(limit=1, path='/main')[0].rev
     self.assertEqual(self.rev1, result)
     result = self.repo.log(limit=1, path='/copy')[0].rev
     self.assertEqual(self.rev2, result)
+    result = self.repo.log(limit=1, path='/revert')[0].rev
+    self.assertEqual(self.rev5, result)
   
-  def test_log2(self):
-    result = self.repo.log(revrange=self.rev1, path='/main').rev
-    self.assertEqual(self.rev1, result)
-    result = self.repo.log(revrange=self.rev2, path='/copy').rev
-    self.assertEqual(self.rev2, result)
-
   def test_ls1(self):
-    result = self.repo.ls(self.rev1, '/main',
-                          directory=True,
+    result = self.repo.ls(self.working_head, '/main',
                           report=['commit'])[0].commit
     self.assertEqual(self.rev1, result)
-    result = self.repo.ls(self.rev2, '/copy',
-                          directory=True,
+    result = self.repo.ls(self.working_head, '/copy',
                           report=['commit'])[0].commit
     self.assertEqual(self.rev2, result)
+  
+  def test_ls2(self):
+    result = self.repo.ls(self.working_head, '/main',
+                          report=['commit'])[0].commit
+    self.assertEqual(self.rev1, result)
+    result = self.repo.ls(self.working_head, '/revert',
+                          report=['commit'])[0].commit
+    self.assertEqual(self.rev5, result)
 
-class GitCopyTest(GitTest, CopyTest):
-  pass
-
-class SvnCopyTest(SvnTest, CopyTest):
-  pass
-
-class HgCopyTest(HgTest, CopyTest):
-  pass
+class GitCopyTest(GitTest, CopyTest): pass
+class SvnCopyTest(SvnTest, CopyTest): pass
+class HgCopyTest(HgTest, CopyTest): pass
 
 if __name__ == '__main__':
   unittest.main()
