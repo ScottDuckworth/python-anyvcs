@@ -215,7 +215,7 @@ class GitRepo(VCSRepo):
         return self.branches() + self.tags()
 
     def empty(self):
-        cmd = [GIT, 'rev-parse', 'HEAD']
+        cmd = [GIT, 'rev-list', '-n1', '--all']
         p = subprocess.Popen(
             cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )

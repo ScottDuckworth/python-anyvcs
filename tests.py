@@ -618,6 +618,40 @@ class SvnEmptyWithCommitsTest(SvnTest, EmptyWithCommitsTest):
     pass
 
 
+### TEST CASE: EmptyMainBranchTest ###
+
+class EmptyMainBranchTest(object):
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        yield CreateBranch('branch1')
+        with open(os.path.join(working_path, 'a'), 'w') as f:
+            f.write('blah')
+        yield Commit('create a')
+
+    def test_empty(self):
+        result = self.repo.empty()
+        correct = False
+        self.assertEqual(correct, result)
+
+    def test_len(self):
+        result = len(self.repo)
+        correct = 1
+        self.assertEqual(correct, result)
+
+    def test_branches(self):
+        result = self.repo.branches()
+        correct = ['branch1']
+        self.assertEqual(normalize_heads(correct), normalize_heads(result))
+
+
+class GitEmptyMainBranchTest(GitTest, EmptyMainBranchTest):
+    pass
+
+
+class HgEmptyMainBranchTest(HgTest, EmptyMainBranchTest):
+    pass
+
+
 ### TEST CASE: BasicTest ###
 
 class BasicTest(object):
