@@ -230,7 +230,10 @@ class HgRepo(VCSRepo):
                     except KeyError:
                         pass
                 if lookup:
-                    p = type(self).cleanPath(path + '/' + name)
+                    if name:
+                        p = type(self).cleanPath(path + '/' + name)
+                    else:
+                        p = path
                     lookup_commit[p] = (entry, objid)
             results.append(entry)
 
