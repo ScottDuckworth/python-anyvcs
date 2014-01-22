@@ -469,3 +469,5 @@ class VCSRepo(object):
 
         """
         raise NotImplementedError
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

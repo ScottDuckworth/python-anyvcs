@@ -2276,3 +2276,5 @@ class HgCopyTest(HgTest, CopyTest): pass
 
 if __name__ == '__main__':
     unittest.main()
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

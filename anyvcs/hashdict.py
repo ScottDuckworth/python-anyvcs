@@ -113,3 +113,5 @@ class HashDict(collections.MutableMapping):
 
     def __len__(self):
         return len(list(self.__iter__()))
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

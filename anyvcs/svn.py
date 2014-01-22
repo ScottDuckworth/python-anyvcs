@@ -687,3 +687,5 @@ class SvnRepo(VCSRepo):
         p.wait()
         if p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

@@ -364,3 +364,5 @@ class GitRepo(VCSRepo):
                 else:
                     revinfo.setdefault(rev, {})[k] = v
         return results
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

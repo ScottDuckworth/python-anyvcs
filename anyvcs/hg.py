@@ -230,7 +230,10 @@ class HgRepo(VCSRepo):
                     except KeyError:
                         pass
                 if lookup:
-                    p = type(self).cleanPath(path + '/' + name)
+                    if name:
+                        p = type(self).cleanPath(path + '/' + name)
+                    else:
+                        p = path
                     lookup_commit[p] = (entry, objid)
             results.append(entry)
 
@@ -463,3 +466,5 @@ class HgRepo(VCSRepo):
         if ls[0].get('type') != 'f':
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
