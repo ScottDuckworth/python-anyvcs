@@ -31,3 +31,5 @@ setup(
         'Topic :: Software Development :: Version Control',
     ],
 )
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

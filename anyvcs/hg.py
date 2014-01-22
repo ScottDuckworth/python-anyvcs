@@ -463,3 +463,5 @@ class HgRepo(VCSRepo):
         if ls[0].get('type') != 'f':
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
