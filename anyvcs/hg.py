@@ -225,7 +225,8 @@ class HgRepo(VCSRepo):
                 if objid:
                     try:
                         import hashlib
-                        k = hashlib.sha1(fullpath+objid).hexdigest()
+                        concat = (fullpath + objid).encode(self.encoding)
+                        k = hashlib.sha1(concat).hexdigest()
                         entry.commit = self._object_cache[k]
                         entry._commit_cached = True
                         lookup = False
@@ -265,7 +266,8 @@ class HgRepo(VCSRepo):
                             entry.commit = commit
                             if objid:
                                 import hashlib
-                                k = hashlib.sha1(p+objid).hexdigest()
+                                concat = (p + objid).encode(self.encoding)
+                                k = hashlib.sha1(concat).hexdigest()
                                 self._object_cache[k] = commit
                             del lookup_commit[p]
                             break
