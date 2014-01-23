@@ -227,7 +227,7 @@ class SvnTest(VCSTest):
         if cls.working_head == 'HEAD':
             return int(rev)
         else:
-            return '/%s:%s' % (cls.encode_branch(cls.working_head), rev)
+            return '%s:%s' % (cls.encode_branch(cls.working_head), rev)
 
     @classmethod
     def export(cls, rev, path):
