@@ -163,13 +163,14 @@ class GitRepo(VCSRepo):
                 assert False, 'unexpected output: ' + str(line)
             if 'commit' in report:
                 try:
-                    entry.commit = self._object_cache[objid]
+                    entry.commit = self._object_cache[objid].decode()
                     entry._commit_cached = True
                 except KeyError:
                     ename = name.encode(self.encoding)
                     cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
-                    commit = self._command(cmd).decode()
-                    entry.commit = self._object_cache[objid] = commit
+                    commit = self._command(cmd)
+                    self._object_cache[objid] = commit
+                    entry.commit = commit.decode()
             results.append(entry)
 
         return results
@@ -273,11 +274,12 @@ class GitRepo(VCSRepo):
                 else:
                     cmd.append(revrange[0] + '..' + revrange[1])
         else:
-            entry = self._commit_cache.get(self.canonical_rev(revrange))
+            rev = self.canonical_rev(revrange)
+            entry = self._commit_cache.get(rev)
             if entry:
                 entry._cached = True
                 return entry
-            cmd.extend(['-1', revrange])
+            cmd.extend(['-1', rev])
             single = True
         if path:
             if follow:

@@ -224,7 +224,7 @@ class HgRepo(VCSRepo):
                 lookup = True
                 if objid:
                     try:
-                        entry.commit = self._object_cache[objid]
+                        entry.commit = self._object_cache[objid].decode()
                         entry._commit_cached = True
                         lookup = False
                     except KeyError:
@@ -262,7 +262,7 @@ class HgRepo(VCSRepo):
                             entry, objid = lookup_commit[p]
                             entry.commit = commit
                             if objid:
-                                self._object_cache[objid] = commit
+                                self._object_cache[objid] = commit.encode()
                             del lookup_commit[p]
                             break
 
