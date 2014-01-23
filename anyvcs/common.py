@@ -173,13 +173,13 @@ class CommitLogEntry(object):
 class CommitLogCache(HashDict):
     def __getitem__(self, key):
         value = HashDict.__getitem__(self, key)
-        value = CommitLogEntry.from_json(value)
+        value = CommitLogEntry.from_json(value.decode())
         if value:
             return value
         raise KeyError(key)
 
     def __setitem__(self, key, value):
-        value = value.to_json()
+        value = value.to_json().encode()
         HashDict.__setitem__(self, key, value)
 
 

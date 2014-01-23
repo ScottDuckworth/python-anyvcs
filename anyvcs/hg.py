@@ -227,7 +227,7 @@ class HgRepo(VCSRepo):
                         import hashlib
                         concat = (fullpath + objid).encode(self.encoding)
                         k = hashlib.sha1(concat).hexdigest()
-                        entry.commit = self._object_cache[k]
+                        entry.commit = self._object_cache[k].decode()
                         entry._commit_cached = True
                         lookup = False
                     except KeyError:
@@ -268,7 +268,7 @@ class HgRepo(VCSRepo):
                                 import hashlib
                                 concat = (p + objid).encode(self.encoding)
                                 k = hashlib.sha1(concat).hexdigest()
-                                self._object_cache[k] = commit
+                                self._object_cache[k] = commit.encode()
                             del lookup_commit[p]
                             break
 

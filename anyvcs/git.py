@@ -91,6 +91,7 @@ class GitRepo(VCSRepo):
         self, rev, path, recursive=False, recursive_dirs=False,
         directory=False, report=()
     ):
+        rev = self.canonical_rev(rev)
         path = type(self).cleanPath(path)
         forcedir = False
         if path.endswith('/'):
@@ -103,7 +104,7 @@ class GitRepo(VCSRepo):
             if directory:
                 entry = attrdict(path='/', type='d')
                 if 'commit' in report:
-                    entry.commit = self.canonical_rev(rev)
+                    entry.commit = rev
                 return [entry]
         else:
             epath = path.rstrip('/').encode(self.encoding)
@@ -162,13 +163,14 @@ class GitRepo(VCSRepo):
                 assert False, 'unexpected output: ' + str(line)
             if 'commit' in report:
                 try:
-                    entry.commit = self._object_cache[objid]
+                    entry.commit = self._object_cache[objid].decode()
                     entry._commit_cached = True
                 except KeyError:
                     ename = name.encode(self.encoding)
                     cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
-                    commit = self._command(cmd).decode()
-                    entry.commit = self._object_cache[objid] = commit
+                    commit = self._command(cmd)
+                    self._object_cache[objid] = commit
+                    entry.commit = commit.decode()
             results.append(entry)
 
         return results
@@ -272,11 +274,12 @@ class GitRepo(VCSRepo):
                 else:
                     cmd.append(revrange[0] + '..' + revrange[1])
         else:
-            entry = self._commit_cache.get(self.canonical_rev(revrange))
+            rev = self.canonical_rev(revrange)
+            entry = self._commit_cache.get(rev)
             if entry:
                 entry._cached = True
                 return entry
-            cmd.extend(['-1', revrange])
+            cmd.extend(['-1', rev])
             single = True
         if path:
             if follow:
@@ -298,10 +301,10 @@ class GitRepo(VCSRepo):
         return results
 
     def changed(self, rev):
-        cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--first-parent', '--root', rev]
+        cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
         output = self._command(cmd)
         results = []
-        for line in output.rstrip(b'\0').split(b'\0:')[1:]:
+        for line in output.rstrip(b'\0').split(b'\0:'):
             path = line.split(b'\0')
             meta = path.pop(0).split()
             status = meta[3].decode()[0]
@@ -315,7 +318,7 @@ class GitRepo(VCSRepo):
         return results
 
     def pdiff(self, rev):
-        cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--first-parent', '--root', rev]
+        cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
         return self._command(cmd)
 
     def diff(self, rev_a, rev_b, path=None):
