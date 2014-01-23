@@ -470,4 +470,17 @@ class VCSRepo(object):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def tip(self, head):
+        """Find the tip of a named head
+
+        :param str head: name of head to look up
+        :returns: revision identifier of head
+
+        The returned identifier should be a valid input for :meth:`VCSRepo.ls`.
+        and respect the branch name in the returned identifier if applicable.
+
+        """
+        raise NotImplementedError
+
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

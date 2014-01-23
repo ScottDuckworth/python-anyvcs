@@ -467,4 +467,7 @@ class HgRepo(VCSRepo):
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
 
+    def tip(self, head):
+        return self.canonical_rev(head)
+
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
