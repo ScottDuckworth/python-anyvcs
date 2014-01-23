@@ -991,6 +991,10 @@ class BasicTest(object):
         result = self.repo.canonical_rev(self.working_head)
         self.assertEqual(self.rev1, result)
 
+    def test_tip(self):
+        result = self.repo.tip(self.main_branch)
+        self.assertEqual(self.rev1, result)
+
 
 class GitLikeBasicTest(BasicTest):
     def test_log_all(self):

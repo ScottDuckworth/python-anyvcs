@@ -689,6 +689,8 @@ class SvnRepo(VCSRepo):
             raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
     def tip(self, head):
+        if head == 'HEAD':
+            return self.youngest()
         rev = self.log(limit=1, path=head)[0].rev
         return '{head}:{rev}'.format(head=head, rev=rev)
 
