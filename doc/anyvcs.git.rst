@@ -1,5 +1,5 @@
-``git`` -- Git concepts
-=======================
+Git-specific functionality 
+==========================
 
 .. module:: anyvcs.git
 

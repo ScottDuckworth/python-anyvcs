@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-python-anyvcs
-=============
+python-anyvcs |version| (|release|)
+===================================
 
 python-anyvcs is an abstraction layer for the homogenous, local handling of:
 
@@ -30,6 +30,9 @@ Contents
    :maxdepth: 2
 
    anyvcs
+   anyvcs.git
+   anyvcs.hg
+   anyvcs.svn
 
 Indices and tables
 ==================

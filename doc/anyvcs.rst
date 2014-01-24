@@ -1,5 +1,5 @@
-``anyvcs`` package
-==================
+The primary API
+================
 
 Opening and Creating
 --------------------
@@ -39,13 +39,3 @@ on the given parameters.
 
 .. autoclass:: FileChangeInfo
    :members:
-
-VCS-specific information
-------------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   anyvcs.git
-   anyvcs.hg
-   anyvcs.svn
