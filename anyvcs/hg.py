@@ -213,7 +213,7 @@ class HgRepo(VCSRepo):
                 if 'executable' in report:
                     entry.executable = t == '*'
                 if 'size' in report:
-                    entry.size = len(self._cat(revstr, name))
+                    entry.size = len(self._cat(revstr, fullpath))
             elif t == '@':
                 entry.type = 'l'
                 if 'target' in report:
