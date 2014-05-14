@@ -783,12 +783,20 @@ class BasicTest(object):
         ]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
-    def test_ls_report_size(self):
+    def test_ls_report_size1(self):
         result = self.repo.ls(self.main_branch, '/', report=('size',))
         correct = [
             {'path': 'a', 'name': 'a', 'type': 'f', 'size': 6},
             {'path': 'b', 'name': 'b', 'type': 'l'},
             {'path': 'c', 'name': 'c', 'type': 'd'},
+        ]
+        self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+    def test_ls_report_size2(self):
+        result = self.repo.ls(self.main_branch, '/c/d', report=('size',))
+        correct = [
+            {'path': 'c/d/e', 'name': 'e', 'type': 'f', 'size': 6},
+            {'path': 'c/d/f', 'name': 'f', 'type': 'l'},
         ]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
