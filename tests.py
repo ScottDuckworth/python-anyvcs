@@ -693,7 +693,7 @@ class BasicTest(object):
             f.write('Denali')
         os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0o755)
         os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
-        yield Bookmark('a', '0000000')
+        yield Bookmark('rev0', cls.getAbsoluteRev())
         yield Commit('commit 1\n\nsetup working copy')
         cls.rev1 = cls.getAbsoluteRev()
 
@@ -1076,12 +1076,12 @@ class HgBasicTest(HgTest, GitLikeBasicTest):
 
     def test_bookmarks(self):
         result = self.repo.bookmarks()
-        correct = [u'a']
+        correct = ['rev0']
         self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
     def test_heads(self):
         result = self.repo.heads()
-        correct = ['default', 'tip']
+        correct = ['rev0', 'default', 'tip']
         self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
 
