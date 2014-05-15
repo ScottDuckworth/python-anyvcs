@@ -467,6 +467,32 @@ class CreateTag(Action):
         test.check_call(['svn', 'copy', url1, url2, '-m', 'create tag ' + self.name])
 
 
+class Bookmark(Action):
+    """Create bookmark if supported"""
+
+    def __init__(self, name, rev=None):
+        self.name = name
+        self.rev = rev
+
+    def doGit(self, test):
+        pass
+
+    def doHg(self, test):
+        cmd = ['hg', 'bookmark', self.name]
+        if self.rev:
+            cmd.extend(['-r', self.rev])
+        test.check_call(cmd)
+        try:
+            test.check_call(['hg', 'push', '-B', self.name])
+        except subprocess.CalledProcessError as e:
+            # hg push returns 1 when there are no revs to push
+            if e.returncode != 1:
+                raise
+
+    def doSvn(self, test):
+        pass
+
+
 ### TEST CASE: EmptyTest ###
 
 class EmptyTest(object):
@@ -667,6 +693,7 @@ class BasicTest(object):
             f.write('Denali')
         os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0o755)
         os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
+        yield Bookmark('a', '0000000')
         yield Commit('commit 1\n\nsetup working copy')
         cls.rev1 = cls.getAbsoluteRev()
 
@@ -1049,7 +1076,7 @@ class HgBasicTest(HgTest, GitLikeBasicTest):
 
     def test_bookmarks(self):
         result = self.repo.bookmarks()
-        correct = []
+        correct = [u'a']
         self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
     def test_heads(self):
