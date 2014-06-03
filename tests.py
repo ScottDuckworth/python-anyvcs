@@ -155,6 +155,8 @@ class VCSTest(unittest.TestCase):
 
 
 class GitTest(VCSTest):
+    vcs = 'git'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'git')
@@ -186,6 +188,8 @@ class GitTest(VCSTest):
 
 
 class HgTest(VCSTest):
+    vcs = 'hg'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'hg')
@@ -210,6 +214,8 @@ class HgTest(VCSTest):
 
 
 class SvnTest(VCSTest):
+    vcs = 'svn'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'svn')
@@ -884,6 +890,11 @@ class BasicTest(object):
         result = self.repo.ls(self.main_branch, '/c/d', directory=True, report=('commit',))
         correct = [{'path': 'c/d', 'type': 'd', 'commit': self.rev1}]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+    def test_probe(self):
+        result = anyvcs.probe(self.repo.path)
+        correct = self.vcs
+        self.assertEqual(correct, result)
 
     def test_cat1(self):
         result = self.repo.cat(self.main_branch, 'a')
