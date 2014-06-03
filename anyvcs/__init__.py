@@ -26,13 +26,14 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__version__ = '1.3.1'
+from .version import __version__
 
 
 def create(path, vcs):
     """Create a new repository
 
-    vcs is either 'git', 'hg', or 'svn'
+    :param str path: The path where to create the repository.
+    :param str vcs: Either ``git``, ``hg``, or ``svn``
 
     """
     from .common import UnknownVCSType
@@ -53,7 +54,13 @@ def create(path, vcs):
 def open(path, vcs=None):
     """Open an existing repository
 
-    vcs can be specified to avoid auto-detection of repository type
+    :param str path: The path of the repository
+    :param vcs: If specified, assume the given repository type to avoid
+                auto-detection. Either ``git``, ``hg``, or ``svn``.
+    :raises UnknownVCSType: if the repository type couldn't be inferred
+    
+    This function employs some heuristics to guess the type of the repository
+    being opened when ``vcs`` is not specified.
 
     """
     import os

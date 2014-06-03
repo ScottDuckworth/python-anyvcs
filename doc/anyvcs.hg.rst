@@ -1,5 +1,5 @@
-``hg`` -- Mercurial concepts
-============================
+Mercurial-specific functionality
+================================
 
 .. module:: anyvcs.hg
 
