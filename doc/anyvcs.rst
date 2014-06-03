@@ -12,6 +12,8 @@ on the given parameters.
 
 .. autofunction:: open
 
+.. autofunction:: probe
+
 .. autofunction:: create
 
 .. module:: anyvcs.common
