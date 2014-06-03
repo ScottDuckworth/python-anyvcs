@@ -688,4 +688,10 @@ class SvnRepo(VCSRepo):
         if p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
 
+    def tip(self, head):
+        if head == 'HEAD':
+            return self.youngest()
+        rev = self.log(limit=1, path=head)[0].rev
+        return '{head}:{rev}'.format(head=head, rev=rev)
+
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
