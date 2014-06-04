@@ -62,6 +62,13 @@ class HgRepo(VCSRepo):
     """
 
     @classmethod
+    def clone(cls, srcpath, destpath):
+        """Clone an existing repository to a new bare repository."""
+        cmd = [HG, 'clone', '--quiet', '--noupdate', srcpath, destpath]
+        subprocess.check_call(cmd)
+        return cls(destpath)
+
+    @classmethod
     def create(cls, path):
         """Create a new repository"""
         cmd = [HG, 'init', path]

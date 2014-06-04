@@ -82,6 +82,22 @@ class SvnRepo(VCSRepo):
     """
 
     @classmethod
+    def clone(cls, srcpath, destpath):
+        """Copy a main repository to a new location."""
+        cmd = [SVNADMIN, 'dump', '--quiet', '.']
+        dump = subprocess.Popen(
+               cmd, cwd=srcpath, stdout=subprocess.PIPE,
+               stderr=subprocess.PIPE,
+        )
+        repo = cls.create(destpath)
+        repo.load(dump.stdout)
+        stderr = dump.stderr.read()
+        dump.wait()
+        if dump.returncode != 0:
+            raise subprocess.CalledProcessError(dump.returncode, cmd, stderr)
+        return repo
+
+    @classmethod
     def create(cls, path):
         """Create a new repository"""
         cmd = [SVNADMIN, 'create', path]
