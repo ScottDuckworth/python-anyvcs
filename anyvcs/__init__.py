@@ -37,17 +37,7 @@ def create(path, vcs):
 
     """
     from .common import UnknownVCSType
-    if vcs == 'git':
-        from .git import GitRepo
-        cls = GitRepo
-    elif vcs == 'hg':
-        from .hg import HgRepo
-        cls = HgRepo
-    elif vcs == 'svn':
-        from .svn import SvnRepo
-        cls = SvnRepo
-    else:
-        raise UnknownVCSType(vcs)
+    cls = _get_repo_class(vcs)
     return cls.create(path)
 
 
@@ -97,20 +87,24 @@ def open(path, vcs=None):
 
     """
     import os
-    from .common import UnknownVCSType
     assert os.path.isdir(path), path + ' is not a directory'
     vcs = vcs or probe(path)
+    cls = _get_repo_class(vcs)
+    return cls(path)
+
+
+def _get_repo_class(vcs):
+    from .common import UnknownVCSType
     if vcs == 'git':
         from .git import GitRepo
-        cls = GitRepo
+        return GitRepo
     elif vcs == 'hg':
         from .hg import HgRepo
-        cls = HgRepo
+        return HgRepo
     elif vcs == 'svn':
         from .svn import SvnRepo
-        cls = SvnRepo
+        return SvnRepo
     else:
         raise UnknownVCSType(vcs)
-    return cls(path)
 
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
