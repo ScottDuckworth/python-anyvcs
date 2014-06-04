@@ -92,6 +92,8 @@ class SvnRepo(VCSRepo):
         repo = cls.create(destpath)
         repo.load(dump.stdout)
         stderr = dump.stderr.read()
+        dump.stdout.close()
+        dump.stderr.close()
         dump.wait()
         if dump.returncode != 0:
             raise subprocess.CalledProcessError(dump.returncode, cmd, stderr)
@@ -700,6 +702,7 @@ class SvnRepo(VCSRepo):
             stderr=subprocess.PIPE
         )
         stderr = p.stderr.read()
+        p.stderr.close()
         p.wait()
         if p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
