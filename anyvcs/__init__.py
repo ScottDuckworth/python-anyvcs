@@ -29,6 +29,23 @@
 from .version import __version__
 
 
+def clone(srcpath, destpath, vcs=None):
+    """Clone an existing repository.
+
+    :param str srcpath: Path to an existing repository
+    :param str destpath: Desired path of new repository
+    :param str vcs: Either ``git``, ``hg``, or ``svn``
+    :returns VCSRepo: The newly cloned repository
+
+    If ``vcs`` is not given, then the repository type is discovered from
+    ``srcpath`` via :func:`probe`.
+
+    """
+    vcs = vcs or probe(srcpath)
+    cls = _get_repo_class(vcs)
+    return cls.clone(srcpath, destpath)
+
+
 def create(path, vcs):
     """Create a new repository
 
@@ -36,7 +53,6 @@ def create(path, vcs):
     :param str vcs: Either ``git``, ``hg``, or ``svn``
 
     """
-    from .common import UnknownVCSType
     cls = _get_repo_class(vcs)
     return cls.create(path)
 
