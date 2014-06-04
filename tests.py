@@ -227,7 +227,7 @@ class SvnTest(VCSTest):
         if cls.working_head == 'HEAD':
             return int(rev)
         else:
-            return '/%s:%s' % (cls.encode_branch(cls.working_head), rev)
+            return '%s:%s' % (cls.encode_branch(cls.working_head), rev)
 
     @classmethod
     def export(cls, rev, path):
@@ -467,6 +467,32 @@ class CreateTag(Action):
         test.check_call(['svn', 'copy', url1, url2, '-m', 'create tag ' + self.name])
 
 
+class Bookmark(Action):
+    """Create bookmark if supported"""
+
+    def __init__(self, name, rev=None):
+        self.name = name
+        self.rev = rev
+
+    def doGit(self, test):
+        pass
+
+    def doHg(self, test):
+        cmd = ['hg', 'bookmark', self.name]
+        if self.rev:
+            cmd.extend(['-r', self.rev])
+        test.check_call(cmd)
+        try:
+            test.check_call(['hg', 'push', '-B', self.name])
+        except subprocess.CalledProcessError as e:
+            # hg push returns 1 when there are no revs to push
+            if e.returncode != 1:
+                raise
+
+    def doSvn(self, test):
+        pass
+
+
 ### TEST CASE: EmptyTest ###
 
 class EmptyTest(object):
@@ -667,6 +693,7 @@ class BasicTest(object):
             f.write('Denali')
         os.chmod(os.path.join(working_path, 'c', 'd', 'e'), 0o755)
         os.symlink('e', os.path.join(working_path, 'c', 'd', 'f'))
+        yield Bookmark('rev0', cls.getAbsoluteRev())
         yield Commit('commit 1\n\nsetup working copy')
         cls.rev1 = cls.getAbsoluteRev()
 
@@ -783,12 +810,20 @@ class BasicTest(object):
         ]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
-    def test_ls_report_size(self):
+    def test_ls_report_size1(self):
         result = self.repo.ls(self.main_branch, '/', report=('size',))
         correct = [
             {'path': 'a', 'name': 'a', 'type': 'f', 'size': 6},
             {'path': 'b', 'name': 'b', 'type': 'l'},
             {'path': 'c', 'name': 'c', 'type': 'd'},
+        ]
+        self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+    def test_ls_report_size2(self):
+        result = self.repo.ls(self.main_branch, '/c/d', report=('size',))
+        correct = [
+            {'path': 'c/d/e', 'name': 'e', 'type': 'f', 'size': 6},
+            {'path': 'c/d/f', 'name': 'f', 'type': 'l'},
         ]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
 
@@ -991,6 +1026,10 @@ class BasicTest(object):
         result = self.repo.canonical_rev(self.working_head)
         self.assertEqual(self.rev1, result)
 
+    def test_tip(self):
+        result = self.repo.tip(self.main_branch)
+        self.assertEqual(self.rev1, result)
+
 
 class GitLikeBasicTest(BasicTest):
     def test_log_all(self):
@@ -1049,12 +1088,12 @@ class HgBasicTest(HgTest, GitLikeBasicTest):
 
     def test_bookmarks(self):
         result = self.repo.bookmarks()
-        correct = []
+        correct = ['rev0']
         self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
     def test_heads(self):
         result = self.repo.heads()
-        correct = ['default', 'tip']
+        correct = ['rev0', 'default', 'tip']
         self.assertEqual(normalize_heads(correct), normalize_heads(result))
 
 
@@ -1325,6 +1364,18 @@ class BranchTestStep3(object):
         result = self.repo.cat(branch1, '/b')
         self.assertEqual('step 3'.encode(), result)
 
+    def test_tip1(self):
+        main = self.encode_branch(self.main_branch)
+        result = self.repo.tip(main)
+        correct = self.rev[2]
+        self.assertEqual(correct, result)
+
+    def test_tip2(self):
+        branch1 = self.encode_branch('branch1')
+        result = self.repo.tip(branch1)
+        correct = self.rev[4]
+        self.assertEqual(correct, result)
+
 
 class GitLikeBranchTestStep3(BranchTestStep3):
     def test_branches(self):
@@ -1543,6 +1594,30 @@ class BranchTestStep7(object):
         correct = [branch_prefix + 'b']
         self.assertEqual(correct, [x.path for x in result])
 
+    def test_tip1(self):
+        main = self.encode_branch(self.main_branch)
+        result = self.repo.tip(main)
+        correct = self.rev[5]
+        self.assertEqual(correct, result)
+
+    def test_tip2(self):
+        branch1 = self.encode_branch('branch1')
+        result = self.repo.tip(branch1)
+        correct = self.rev[8]
+        self.assertEqual(correct, result)
+
+    def test_tip3(self):
+        branch2 = self.encode_branch('branch2')
+        result = self.repo.tip(branch2)
+        correct = self.rev[7]
+        self.assertEqual(correct, result)
+
+    def test_tip4(self):
+        branch1a = self.encode_branch('branch1a')
+        result = self.repo.tip(branch1a)
+        correct = self.rev[10]
+        self.assertEqual(correct, result)
+
 
 class GitLikeBranchTestStep7(BranchTestStep7):
     def test_branches(self):
@@ -1623,7 +1698,7 @@ class GitLikeBranchTestStep7(BranchTestStep7):
         self.assertEqual(correct, result)
 
 
-class GitBranchTestStep6(GitTest, GitLikeBranchTestStep7):
+class GitBranchTestStep7(GitTest, GitLikeBranchTestStep7):
     pass
 
 
@@ -1757,6 +1832,30 @@ class BranchTestStep9(object):
         result = self.repo.cat(branch1, '/c')
         self.assertEqual('step 4'.encode(), result)
 
+    def test_tip1(self):
+        main = self.encode_branch(self.main_branch)
+        result = self.repo.tip(main)
+        correct = self.rev[12]
+        self.assertEqual(correct, result)
+
+    def test_tip2(self):
+        branch1 = self.encode_branch('branch1')
+        result = self.repo.tip(branch1)
+        correct = self.rev[11]
+        self.assertEqual(correct, result)
+
+    def test_tip3(self):
+        branch2 = self.encode_branch('branch2')
+        result = self.repo.tip(branch2)
+        correct = self.rev[7]
+        self.assertEqual(correct, result)
+
+    def test_tip4(self):
+        branch1a = self.encode_branch('branch1a')
+        result = self.repo.tip(branch1a)
+        correct = self.rev[10]
+        self.assertEqual(correct, result)
+
 
 class GitLikeBranchTestStep9(BranchTestStep9):
     def test_log_main(self):
@@ -1876,6 +1975,30 @@ class BranchTestStep11(object):
         self.assertEqual('step 7'.encode(), result)
         result = self.repo.cat(branch1, '/c')
         self.assertEqual('step 5'.encode(), result)
+
+    def test_tip1(self):
+        main = self.encode_branch(self.main_branch)
+        result = self.repo.tip(main)
+        correct = self.rev[12]
+        self.assertEqual(correct, result)
+
+    def test_tip2(self):
+        branch1 = self.encode_branch('branch1')
+        result = self.repo.tip(branch1)
+        correct = self.rev[14]
+        self.assertEqual(correct, result)
+
+    def test_tip3(self):
+        branch2 = self.encode_branch('branch2')
+        result = self.repo.tip(branch2)
+        correct = self.rev[7]
+        self.assertEqual(correct, result)
+
+    def test_tip4(self):
+        branch1a = self.encode_branch('branch1a')
+        result = self.repo.tip(branch1a)
+        correct = self.rev[10]
+        self.assertEqual(correct, result)
 
 
 class GitLikeBranchTestStep11(BranchTestStep11):
@@ -2018,6 +2141,12 @@ class BranchTestStep13(object):
         self.assertEqual('step 7'.encode(), result)
         result = self.repo.cat(self.main_branch, '/c')
         self.assertEqual('step 5'.encode(), result)
+
+    def test_tip1(self):
+        main = self.encode_branch(self.main_branch)
+        result = self.repo.tip(main)
+        correct = self.rev[15]
+        self.assertEqual(correct, result)
 
 
 class GitLikeBranchTestStep13(BranchTestStep13):

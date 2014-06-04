@@ -548,7 +548,7 @@ class SvnRepo(VCSRepo):
 
         minrev = min(rev1, rev2)
         if prefix1 == prefix2:
-            return '%s:%d' % (prefix1, minrev)
+            return '%s:%d' % (prefix1.lstrip('/'), minrev)
 
         history1 = self._history(minrev, prefix1)
         history2 = self._history(minrev, prefix2)
@@ -570,7 +570,7 @@ class SvnRepo(VCSRepo):
                     youngest = h
 
         if youngest.rev > 0:
-            return '%s:%d' % (youngest.path, youngest.rev)
+            return '%s:%d' % (youngest.path.lstrip('/'), youngest.rev)
 
         i1 = 0
         i2 = 0
@@ -583,7 +583,7 @@ class SvnRepo(VCSRepo):
                 i1 += 1
             else:
                 if history1[i1].path == history2[i2].path:
-                    return '%s:%d' % (history1[i1].path, history1[i1].rev)
+                    return '%s:%d' % (history1[i1].path.lstrip('/'), history1[i1].rev)
                 else:
                     i1 += 1
                     i2 += 1
@@ -687,5 +687,11 @@ class SvnRepo(VCSRepo):
         p.wait()
         if p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, cmd, stderr)
+
+    def tip(self, head):
+        if head == 'HEAD':
+            return self.youngest()
+        rev = self.log(limit=1, path=head)[0].rev
+        return '{head}:{rev}'.format(head=head, rev=rev)
 
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

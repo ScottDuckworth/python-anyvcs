@@ -37,7 +37,7 @@ HG = 'hg'
 canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
 manifest_rx = re.compile(r'^(?P<object>[0-9a-f]{40}) (?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
 parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
-bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
+bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>[-]?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 annotate_rx = re.compile(r'^(?P<author>.*)\s+(?P<rev>\d+):\s')
 
 
@@ -213,7 +213,7 @@ class HgRepo(VCSRepo):
                 if 'executable' in report:
                     entry.executable = t == '*'
                 if 'size' in report:
-                    entry.size = len(self._cat(revstr, name))
+                    entry.size = len(self._cat(revstr, fullpath))
             elif t == '@':
                 entry.type = 'l'
                 if 'target' in report:
@@ -472,5 +472,8 @@ class HgRepo(VCSRepo):
         if ls[0].get('type') != 'f':
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
+
+    def tip(self, head):
+        return self.canonical_rev(head)
 
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
