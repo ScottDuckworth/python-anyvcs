@@ -703,6 +703,16 @@ class BasicTest(object):
         yield Commit('commit 1\n\nsetup working copy')
         cls.rev1 = cls.getAbsoluteRev()
 
+    def test_clone(self):
+        destpath = tempfile.mktemp(prefix='anyvcs-test-clone.')
+        result = anyvcs.clone(self.repo.path, destpath)
+        self.assertEqual(type(self.repo), type(result))
+        self.assertEqual(destpath, result.path)
+        commits_expected = frozenset(c.rev for c in self.repo.log())
+        commits_actual = frozenset(c.rev for c in result.log())
+        self.assertEqual(commits_expected, commits_actual)
+        shutil.rmtree(destpath)
+
     def test_empty(self):
         result = self.repo.empty()
         correct = False
