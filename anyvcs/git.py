@@ -39,6 +39,14 @@ rev_rx = re.compile(r'^[0-9a-f]{40}$', re.IGNORECASE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 
 
+def readuntil(f, stop):
+  buf = bytes()
+  while True:
+    b = f.read(1)
+    if b == stop or not b:
+      return buf
+    buf += b
+
 class GitRepo(VCSRepo):
     """A git repository
 
@@ -69,15 +77,6 @@ class GitRepo(VCSRepo):
             if e.errno != errno.EEXIST:
                 raise
         return path
-
-    @property
-    def _object_cache(self):
-        try:
-            return self._object_cache_v
-        except AttributeError:
-            object_cache_path = os.path.join(self.private_path, 'object-cache')
-            self._object_cache_v = HashDict(object_cache_path)
-            return self._object_cache_v
 
     def canonical_rev(self, rev):
         rev = str(rev)
@@ -134,11 +133,11 @@ class GitRepo(VCSRepo):
             return []
 
         results = []
+        files = {}
         for line in output.split(b'\0'):
             meta, ename = line.split(b'\t', 1)
             meta = meta.decode().split()
             mode = int(meta[0], 8)
-            objid = meta[2]
             name = ename.decode(self.encoding, 'replace')
             if recursive_dirs and path == name + '/':
                 continue
@@ -161,17 +160,29 @@ class GitRepo(VCSRepo):
                     entry.target = self._cat(rev, ename).decode(self.encoding, 'replace')
             else:
                 assert False, 'unexpected output: ' + str(line)
-            if 'commit' in report:
-                try:
-                    entry.commit = self._object_cache[objid].decode()
-                    entry._commit_cached = True
-                except KeyError:
-                    ename = name.encode(self.encoding)
-                    cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
-                    commit = self._command(cmd)
-                    self._object_cache[objid] = commit
-                    entry.commit = commit.decode()
             results.append(entry)
+            files[ename] = entry
+
+        if 'commit' in report:
+            cmd = [GIT, 'log', '--pretty=format:%H', '--name-only', '-m', '--first-parent', '-z', rev]
+            p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE)
+            commit = readuntil(p.stdout, b'\n').rstrip().split(b'\0')[-1]
+            while commit and files:
+                while True:
+                    f = readuntil(p.stdout, b'\0')
+                    if f == b'':
+                        commit = readuntil(p.stdout, b'\n').split(b'\0')[-1]
+                        break
+                    if not recursive:
+                        d = f[len(path):].find(b'/')
+                        if d != -1:
+                            f = f[:len(path)+d]
+                    if f in files:
+                        files[f].commit = commit.decode()
+                        del files[f]
+            p.stdout.close()
+            p.terminate()
+            p.wait()
 
         return results
 

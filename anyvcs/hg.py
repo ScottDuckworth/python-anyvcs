@@ -224,7 +224,10 @@ class HgRepo(VCSRepo):
                 lookup = True
                 if objid:
                     try:
-                        entry.commit = self._object_cache[objid].decode()
+                        import hashlib
+                        concat = (fullpath + objid).encode(self.encoding)
+                        k = hashlib.sha1(concat).hexdigest()
+                        entry.commit = self._object_cache[k].decode()
                         entry._commit_cached = True
                         lookup = False
                     except KeyError:
@@ -262,7 +265,10 @@ class HgRepo(VCSRepo):
                             entry, objid = lookup_commit[p]
                             entry.commit = commit
                             if objid:
-                                self._object_cache[objid] = commit.encode()
+                                import hashlib
+                                concat = (p + objid).encode(self.encoding)
+                                k = hashlib.sha1(concat).hexdigest()
+                                self._object_cache[k] = commit.encode()
                             del lookup_commit[p]
                             break
 
