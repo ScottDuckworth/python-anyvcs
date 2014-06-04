@@ -2231,7 +2231,11 @@ class CacheTest(object):
         self.assertTrue(result._cached)
 
 
-class GitLikeCacheTest(CacheTest):
+class GitCacheTest(GitTest, CacheTest):
+    pass
+
+
+class HgCacheTest(HgTest, CacheTest):
     def test_ls(self):
         correct = [
             {'path': 'a', 'name': 'a', 'type': 'f', 'commit': self.rev1}
@@ -2240,14 +2244,6 @@ class GitLikeCacheTest(CacheTest):
             result = self.repo.ls(self.main_branch, '/', report=['commit'])
             self.assertEqual(correct, result)
         self.assertTrue(result[0]._commit_cached)
-
-
-class GitCacheTest(GitTest, GitLikeCacheTest):
-    pass
-
-
-class HgCacheTest(HgTest, GitLikeCacheTest):
-    pass
 
 
 class SvnCacheTest(SvnTest, CacheTest):
