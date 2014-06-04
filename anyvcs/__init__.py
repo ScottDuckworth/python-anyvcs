@@ -29,6 +29,23 @@
 from .version import __version__
 
 
+def clone(srcpath, destpath, vcs=None):
+    """Clone an existing repository.
+
+    :param str srcpath: Path to an existing repository
+    :param str destpath: Desired path of new repository
+    :param str vcs: Either ``git``, ``hg``, or ``svn``
+    :returns VCSRepo: The newly cloned repository
+
+    If ``vcs`` is not given, then the repository type is discovered from
+    ``srcpath`` via :func:`probe`.
+
+    """
+    vcs = vcs or probe(srcpath)
+    cls = _get_repo_class(vcs)
+    return cls.clone(srcpath, destpath)
+
+
 def create(path, vcs):
     """Create a new repository
 
@@ -36,19 +53,42 @@ def create(path, vcs):
     :param str vcs: Either ``git``, ``hg``, or ``svn``
 
     """
-    from .common import UnknownVCSType
-    if vcs == 'git':
-        from .git import GitRepo
-        cls = GitRepo
-    elif vcs == 'hg':
-        from .hg import HgRepo
-        cls = HgRepo
-    elif vcs == 'svn':
-        from .svn import SvnRepo
-        cls = SvnRepo
-    else:
-        raise UnknownVCSType(vcs)
+    cls = _get_repo_class(vcs)
     return cls.create(path)
+
+
+def probe(path):
+    """Probe a repository for its type.
+
+    :param str path: The path of the repository
+    :raises UnknownVCSType: if the repository type couldn't be inferred
+    :returns str: either ``git``, ``hg``, or ``svn``
+
+    This function employs some heuristics to guess the type of the repository.
+
+    """
+    import os
+    from .common import UnknownVCSType
+    if os.path.isdir(os.path.join(path, '.git')):
+        return 'git'
+    elif os.path.isdir(os.path.join(path, '.hg')):
+        return 'hg'
+    elif (
+        os.path.isfile(os.path.join(path, 'config')) and
+        os.path.isdir(os.path.join(path, 'objects')) and
+        os.path.isdir(os.path.join(path, 'refs')) and
+        os.path.isdir(os.path.join(path, 'branches'))
+    ):
+        return 'git'
+    elif (
+        os.path.isfile(os.path.join(path, 'format')) and
+        os.path.isdir(os.path.join(path, 'conf')) and
+        os.path.isdir(os.path.join(path, 'db')) and
+        os.path.isdir(os.path.join(path, 'locks'))
+    ):
+        return 'svn'
+    else:
+        raise UnknownVCSType(path)
 
 
 def open(path, vcs=None):
@@ -58,47 +98,29 @@ def open(path, vcs=None):
     :param vcs: If specified, assume the given repository type to avoid
                 auto-detection. Either ``git``, ``hg``, or ``svn``.
     :raises UnknownVCSType: if the repository type couldn't be inferred
-    
-    This function employs some heuristics to guess the type of the repository
-    being opened when ``vcs`` is not specified.
+
+    If ``vcs`` is not specified, it is inferred via :func:`probe`.
 
     """
     import os
-    from .common import UnknownVCSType
     assert os.path.isdir(path), path + ' is not a directory'
+    vcs = vcs or probe(path)
+    cls = _get_repo_class(vcs)
+    return cls(path)
+
+
+def _get_repo_class(vcs):
+    from .common import UnknownVCSType
     if vcs == 'git':
         from .git import GitRepo
-        cls = GitRepo
+        return GitRepo
     elif vcs == 'hg':
         from .hg import HgRepo
-        cls = HgRepo
+        return HgRepo
     elif vcs == 'svn':
         from .svn import SvnRepo
-        cls = SvnRepo
-    elif os.path.isdir(os.path.join(path, '.git')):
-        from .git import GitRepo
-        cls = GitRepo
-    elif os.path.isdir(os.path.join(path, '.hg')):
-        from .hg import HgRepo
-        cls = HgRepo
-    elif (
-        os.path.isfile(os.path.join(path, 'config')) and
-        os.path.isdir(os.path.join(path, 'objects')) and
-        os.path.isdir(os.path.join(path, 'refs')) and
-        os.path.isdir(os.path.join(path, 'branches'))
-    ):
-        from .git import GitRepo
-        cls = GitRepo
-    elif (
-        os.path.isfile(os.path.join(path, 'format')) and
-        os.path.isdir(os.path.join(path, 'conf')) and
-        os.path.isdir(os.path.join(path, 'db')) and
-        os.path.isdir(os.path.join(path, 'locks'))
-    ):
-        from .svn import SvnRepo
-        cls = SvnRepo
+        return SvnRepo
     else:
-        raise UnknownVCSType(path)
-    return cls(path)
+        raise UnknownVCSType(vcs)
 
 # vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

@@ -155,6 +155,8 @@ class VCSTest(unittest.TestCase):
 
 
 class GitTest(VCSTest):
+    vcs = 'git'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'git')
@@ -186,6 +188,8 @@ class GitTest(VCSTest):
 
 
 class HgTest(VCSTest):
+    vcs = 'hg'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'hg')
@@ -210,6 +214,8 @@ class HgTest(VCSTest):
 
 
 class SvnTest(VCSTest):
+    vcs = 'svn'
+
     @classmethod
     def setUpRepos(cls):
         cls.repo = anyvcs.create(cls.main_path, 'svn')
@@ -697,6 +703,16 @@ class BasicTest(object):
         yield Commit('commit 1\n\nsetup working copy')
         cls.rev1 = cls.getAbsoluteRev()
 
+    def test_clone(self):
+        destpath = tempfile.mktemp(prefix='anyvcs-test-clone.')
+        result = anyvcs.clone(self.repo.path, destpath)
+        self.assertEqual(type(self.repo), type(result))
+        self.assertEqual(destpath, result.path)
+        commits_expected = frozenset(c.rev for c in self.repo.log())
+        commits_actual = frozenset(c.rev for c in result.log())
+        self.assertEqual(commits_expected, commits_actual)
+        shutil.rmtree(destpath)
+
     def test_empty(self):
         result = self.repo.empty()
         correct = False
@@ -884,6 +900,11 @@ class BasicTest(object):
         result = self.repo.ls(self.main_branch, '/c/d', directory=True, report=('commit',))
         correct = [{'path': 'c/d', 'type': 'd', 'commit': self.rev1}]
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+    def test_probe(self):
+        result = anyvcs.probe(self.repo.path)
+        correct = self.vcs
+        self.assertEqual(correct, result)
 
     def test_cat1(self):
         result = self.repo.cat(self.main_branch, 'a')
