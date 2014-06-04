@@ -47,6 +47,13 @@ class GitRepo(VCSRepo):
     """
 
     @classmethod
+    def clone(cls, srcpath, destpath, encoding='utf-8'):
+        """Clone an existing repository to a new bare repository."""
+        cmd = [GIT, 'clone', '--quiet', '--bare', srcpath, destpath]
+        subprocess.check_call(cmd)
+        return cls(destpath, encoding)
+
+    @classmethod
     def create(cls, path, encoding='utf-8'):
         """Create a new bare repository"""
         cmd = [GIT, 'init', '--quiet', '--bare', path]
