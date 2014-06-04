@@ -180,6 +180,9 @@ class GitRepo(VCSRepo):
                     if f in files:
                         files[f].commit = commit.decode()
                         del files[f]
+            p.stdout.close()
+            p.terminate()
+            p.wait()
 
         return results
 
