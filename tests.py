@@ -723,6 +723,16 @@ class BasicTest(object):
         self.assertTrue(os.path.exists(result.path))
         shutil.rmtree(destpath)
 
+    def test_init_deep(self):
+        destpath = os.path.join(tempfile.mktemp(prefix='anyvcs-test-create.'),
+                                'deep',
+                                'path')
+        result = anyvcs.create(destpath, self.vcs)
+        self.assertIsInstance(result, anyvcs.common.VCSRepo)
+        self.assertEqual(destpath, result.path)
+        self.assertTrue(os.path.exists(result.path))
+        shutil.rmtree(destpath)
+
     def test_empty(self):
         result = self.repo.empty()
         correct = False
