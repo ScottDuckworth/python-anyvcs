@@ -108,6 +108,11 @@ class SvnRepo(VCSRepo):
     @classmethod
     def create(cls, path):
         """Create a new repository"""
+        try:
+            os.makedirs(path)
+        except OSError as e:
+            if not e.errno == errno.EEXIST:
+                raise
         cmd = [SVNADMIN, 'create', path]
         subprocess.check_call(cmd)
         return cls(path)
