@@ -713,6 +713,26 @@ class BasicTest(object):
         self.assertEqual(commits_expected, commits_actual)
         shutil.rmtree(destpath)
 
+    def test_clone_deep(self):
+        destpath = os.path.join(tempfile.mktemp(prefix='anyvcs-test-clone.'),
+                                'deep',
+                                'path')
+        result = anyvcs.clone(self.repo.path, destpath)
+        self.assertEqual(type(self.repo), type(result))
+        self.assertEqual(destpath, result.path)
+        self.assertTrue(os.path.exists(result.path))
+        shutil.rmtree(destpath)
+
+    def test_create_deep(self):
+        destpath = os.path.join(tempfile.mktemp(prefix='anyvcs-test-create.'),
+                                'deep',
+                                'path')
+        result = anyvcs.create(destpath, self.vcs)
+        self.assertIsInstance(result, anyvcs.common.VCSRepo)
+        self.assertEqual(destpath, result.path)
+        self.assertTrue(os.path.exists(result.path))
+        shutil.rmtree(destpath)
+
     def test_empty(self):
         result = self.repo.empty()
         correct = False

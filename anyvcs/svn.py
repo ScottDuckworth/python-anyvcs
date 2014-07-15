@@ -31,6 +31,7 @@ import fnmatch
 import re
 import subprocess
 import sys
+import errno
 from .common import *
 
 DIFF = 'diff'
@@ -84,6 +85,11 @@ class SvnRepo(VCSRepo):
     @classmethod
     def clone(cls, srcpath, destpath):
         """Copy a main repository to a new location."""
+        try:
+            os.makedirs(destpath)
+        except OSError as e:
+            if not e.errno == errno.EEXIST:
+                raise
         cmd = [SVNADMIN, 'dump', '--quiet', '.']
         dump = subprocess.Popen(
                cmd, cwd=srcpath, stdout=subprocess.PIPE,
@@ -102,6 +108,11 @@ class SvnRepo(VCSRepo):
     @classmethod
     def create(cls, path):
         """Create a new repository"""
+        try:
+            os.makedirs(path)
+        except OSError as e:
+            if not e.errno == errno.EEXIST:
+                raise
         cmd = [SVNADMIN, 'create', path]
         subprocess.check_call(cmd)
         return cls(path)
@@ -131,7 +142,6 @@ class SvnRepo(VCSRepo):
         try:
             os.mkdir(path)
         except OSError as e:
-            import errno
             if e.errno != errno.EEXIST:
                 raise
         return path

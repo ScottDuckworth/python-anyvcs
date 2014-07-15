@@ -30,6 +30,7 @@ import datetime
 import os
 import re
 import subprocess
+import errno
 from .common import *
 
 HG = 'hg'
@@ -64,6 +65,12 @@ class HgRepo(VCSRepo):
     @classmethod
     def clone(cls, srcpath, destpath):
         """Clone an existing repository to a new bare repository."""
+        # Mercurial will not create intermediate directories for clones.
+        try:
+            os.makedirs(destpath)
+        except OSError as e:
+            if not e.errno == errno.EEXIST:
+                raise
         cmd = [HG, 'clone', '--quiet', '--noupdate', srcpath, destpath]
         subprocess.check_call(cmd)
         return cls(destpath)
@@ -87,7 +94,6 @@ class HgRepo(VCSRepo):
         try:
             os.mkdir(path)
         except OSError as e:
-            import errno
             if e.errno != errno.EEXIST:
                 raise
         return path
