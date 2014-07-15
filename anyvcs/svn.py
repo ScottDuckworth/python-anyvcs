@@ -493,19 +493,26 @@ class SvnRepo(VCSRepo):
         rev_b, prefix_b = self._maprev(rev_b)
         tmpdir = tempfile.mkdtemp(prefix='anyvcs-svn-diff.')
         try:
-            path_a = os.path.join(tmpdir, 'a')
-            path_b = os.path.join(tmpdir, 'b')
-            url_a = 'file://%s/%s@%d' % (self.path, prefix_a, rev_a)
-            url_b = 'file://%s/%s@%d' % (self.path, prefix_b, rev_b)
+            if not path is None:
+                url_a = 'file://%s/%s/%s@%d' % (self.path, prefix_a, path,
+                                                rev_a)
+                url_b = 'file://%s/%s/%s@%d' % (self.path, prefix_b, path,
+                                                rev_b)
+                path = type(self).cleanPath(path).lstrip('/')
+                path_a = os.path.join(tmpdir, 'a', path)
+                path_b = os.path.join(tmpdir, 'b', path)
+                os.makedirs(os.path.dirname(path_a))
+                os.makedirs(os.path.dirname(path_b))
+            else:
+                url_a = 'file://%s/%s@%d' % (self.path, prefix_a, rev_a)
+                url_b = 'file://%s/%s@%d' % (self.path, prefix_b, rev_b)
+                path_a = os.path.join(tmpdir, 'a')
+                path_b = os.path.join(tmpdir, 'b')
             cmd = [SVN, 'export', '-q', url_a, path_a]
             subprocess.check_call(cmd)
             cmd = [SVN, 'export', '-q', url_b, path_b]
             subprocess.check_call(cmd)
-            if path is None:
-                cmd = [DIFF, '-urN', 'a', 'b']
-            else:
-                path = type(self).cleanPath(path)
-                cmd = [DIFF, '-urN', 'a' + path, 'b' + path]
+            cmd = [DIFF, '-urN', 'a', 'b']
             p = subprocess.Popen(cmd, cwd=tmpdir, stdout=subprocess.PIPE)
             stdout, stderr = p.communicate()
             if p.returncode not in (0, 1):
