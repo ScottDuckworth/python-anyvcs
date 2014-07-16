@@ -650,6 +650,55 @@ class SvnEmptyWithCommitsTest(SvnTest, EmptyWithCommitsTest):
     pass
 
 
+### TEST CASE: DeletedFilesTest ###
+
+class DeletedFilesTest(object):
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        placeholder = os.path.join(working_path, 'placeholder')
+        a = os.path.join(working_path, 'a')
+
+        with open(placeholder, 'w') as f:
+            pass
+        yield Commit('placeholder commit')
+        cls.rev1 = cls.getAbsoluteRev()
+
+        with open(a, 'w') as f:
+            f.write('foo')
+        yield Commit('create a')
+        cls.rev2 = cls.getAbsoluteRev()
+
+        os.unlink(a)
+        yield Commit('delete a')
+        cls.rev3 = cls.getAbsoluteRev()
+
+    def test_diff_created(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'a')
+        diff = ''.join(line for line in diff.splitlines(True)
+                       if line[0] == '+' and
+                          line[1] != '+')
+        self.assertEqual('+foo\n', diff)
+
+    def test_diff_deleted(self):
+        diff = self.repo.diff(self.rev2, self.rev3, 'a')
+        diff = ''.join(line for line in diff.splitlines(True)
+                       if line[0] == '-' and
+                          line[1] != '-')
+        self.assertEqual('-foo\n', diff)
+
+
+class GitDeletedFilesTest(GitTest, DeletedFilesTest):
+    pass
+
+
+class HgDeletedFilesTest(HgTest, DeletedFilesTest):
+    pass
+
+
+class SvnDeletedFilesTest(SvnTest, DeletedFilesTest):
+    pass
+
+
 ### TEST CASE: EmptyMainBranchTest ###
 
 class EmptyMainBranchTest(object):
