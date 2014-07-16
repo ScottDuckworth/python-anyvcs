@@ -46,6 +46,17 @@ changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)\)$')
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
 
+def _add_diff_prefix(diff, a='a', b='b'):
+    output = b''
+    for line in diff.splitlines(True):
+        if line.startswith(b'--- '):
+            line = b'--- %s/' % a + line[4:]
+        if line.startswith(b'+++ '):
+            line = b'+++ %s/' % b + line[4:]
+        output += line
+    return output
+
+
 class SvnRepo(VCSRepo):
     """A Subversion repository
 
@@ -474,52 +485,33 @@ class SvnRepo(VCSRepo):
             return ''
         cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
         output = self._command(cmd)
-        _output = b''
-        for line in output.splitlines(True):
-            if line.startswith(b'--- '):
-                line = b'--- a/' + line[4:]
-            if line.startswith(b'+++ '):
-                line = b'+++ b/' + line[4:]
-            _output += line
-        output = _output
-        return output
+        return _add_diff_prefix(output)
+
+
+    def _compose_url(self, rev=None, path=None, proto='file'):
+        url = '%s://%s' % (proto, self.path)
+        rev, prefix = self._maprev(rev)
+        path = path or ''
+        path = path.lstrip('/')
+        prefix = prefix.lstrip('/')
+        if prefix:
+            url = '%s/%s' % (url, prefix)
+        if path:
+            url = '%s/%s' % (url, path)
+        if not rev is None:
+            url = '%s@%d' % (url, rev)
+        return url
+
 
     def diff(self, rev_a, rev_b, path=None):
-        import os
-        import shutil
-        import tempfile
+        url_a = self._compose_url(rev=rev_a, path=path)
+        url_b = self._compose_url(rev=rev_b, path=path)
+        rev_a = self.canonical_rev(rev_a)
+        rev_b = self.canonical_rev(rev_b)
+        cmd = [SVN, 'diff', url_a, url_b]
+        output = self._command(cmd).decode()
+        return _add_diff_prefix(output)
 
-        rev_a, prefix_a = self._maprev(rev_a)
-        rev_b, prefix_b = self._maprev(rev_b)
-        tmpdir = tempfile.mkdtemp(prefix='anyvcs-svn-diff.')
-        try:
-            if not path is None:
-                url_a = 'file://%s/%s/%s@%d' % (self.path, prefix_a, path,
-                                                rev_a)
-                url_b = 'file://%s/%s/%s@%d' % (self.path, prefix_b, path,
-                                                rev_b)
-                path = type(self).cleanPath(path).lstrip('/')
-                path_a = os.path.join(tmpdir, 'a', path)
-                path_b = os.path.join(tmpdir, 'b', path)
-                os.makedirs(os.path.dirname(path_a))
-                os.makedirs(os.path.dirname(path_b))
-            else:
-                url_a = 'file://%s/%s@%d' % (self.path, prefix_a, rev_a)
-                url_b = 'file://%s/%s@%d' % (self.path, prefix_b, rev_b)
-                path_a = os.path.join(tmpdir, 'a')
-                path_b = os.path.join(tmpdir, 'b')
-            cmd = [SVN, 'export', '-q', url_a, path_a]
-            subprocess.check_call(cmd)
-            cmd = [SVN, 'export', '-q', url_b, path_b]
-            subprocess.check_call(cmd)
-            cmd = [DIFF, '-urN', 'a', 'b']
-            p = subprocess.Popen(cmd, cwd=tmpdir, stdout=subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            if p.returncode not in (0, 1):
-                raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
-            return stdout
-        finally:
-            shutil.rmtree(tmpdir)
 
     def changed(self, rev):
         rev, prefix = self._maprev(rev)
