@@ -337,13 +337,13 @@ class GitRepo(VCSRepo):
 
     def pdiff(self, rev):
         cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def diff(self, rev_a, rev_b, path=None):
         cmd = [GIT, 'diff', rev_a, rev_b]
         if path is not None:
             cmd.extend(['--', type(self).cleanPath(path)])
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def ancestor(self, rev1, rev2):
         cmd = [GIT, 'merge-base', rev1, rev2]
