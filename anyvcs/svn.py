@@ -26,6 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import difflib
 import collections
 import fnmatch
 import re
@@ -502,16 +503,47 @@ class SvnRepo(VCSRepo):
             url = '%s@%d' % (url, rev)
         return url
 
+    def _exists(self, rev, path):
+        try:
+            return self.ls(rev, path, directory=True)[0]
+        except PathDoesNotExist:
+            return False
+
+    def _diff_read(self, rev, path):
+        try:
+            entry = self.ls(rev, path, directory=True)[0]
+            if entry.type == 'f':
+                return self.cat(rev, path)
+            elif entry.type == 'l':
+                return b'link %s\n' % self.readlink(rev, path)
+            else:
+                assert entry.type == 'd'
+                return b'directory\n'
+        except PathDoesNotExist:
+            return b''
 
     def diff(self, rev_a, rev_b, path=None):
-        url_a = self._compose_url(rev=rev_a, path=path)
-        url_b = self._compose_url(rev=rev_b, path=path)
-        rev_a = self.canonical_rev(rev_a)
-        rev_b = self.canonical_rev(rev_b)
-        cmd = [SVN, 'diff', url_a, url_b]
-        output = self._command(cmd).decode()
-        return _add_diff_prefix(output)
-
+        entry_a = not path or self._exists(rev_a, path)
+        entry_b = not path or self._exists(rev_b, path)
+        if not entry_a and not entry_b:
+            return b''
+        elif not entry_a or not entry_b:
+            a = self._diff_read(rev_a, path).splitlines(True)
+            b = self._diff_read(rev_b, path).splitlines(True)
+            _, prefix_a = self._maprev(rev_a)
+            _, prefix_b = self._maprev(rev_b)
+            path_a = '/'.join([prefix_a.lstrip('/'), path])
+            path_b = '/'.join([prefix_b.lstrip('/'), path])
+            diff = difflib.unified_diff(a, b,
+                                        fromfile='a/' + path_a,
+                                        tofile='b/' + path_b)
+            return ''.join(diff)
+        else:
+            url_a = self._compose_url(rev=rev_a, path=path)
+            url_b = self._compose_url(rev=rev_b, path=path)
+            cmd = [SVN, 'diff', url_a, url_b]
+            output = self._command(cmd).decode()
+            return _add_diff_prefix(output)
 
     def changed(self, rev):
         rev, prefix = self._maprev(rev)
