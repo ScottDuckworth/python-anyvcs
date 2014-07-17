@@ -2533,6 +2533,58 @@ class SvnCopyTest(SvnTest, CopyTest):
 class HgCopyTest(HgTest, CopyTest):
     pass
 
+### TEST CASE: SvnHeadRevTest ###
+
+class SvnHeadRevTest(SvnTest):
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        yield CreateStandardDirectoryStructure()
+        cls.rev0 = cls.getAbsoluteRev()
+
+        os.makedirs(os.path.join(working_path, 'a'))
+        touch(os.path.join(working_path, 'a', 'b'), 'foo\n')
+        yield Commit('create a/b')
+        cls.rev1 = cls.getAbsoluteRev()
+
+    def test_ls1(self):
+        expected = [
+            {'name': 'a', 'path': 'trunk/a', 'type': 'd'},
+        ]
+        result = self.repo.ls(self.rev1, '')
+        self.assertEqual(normalize_ls(expected), normalize_ls(result))
+
+    def test_ls2(self):
+        expected = [
+            {'name': 'a', 'path': 'trunk/a', 'type': 'd'},
+        ]
+        result = self.repo.ls(self.rev1, '/')
+        self.assertEqual(normalize_ls(expected), normalize_ls(result))
+
+    def test_ls3(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, '/a')
+        self.assertEqual(normalize_ls(expected), normalize_ls(result))
+    
+    def test_ls3(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, 'a')
+        self.assertEqual(normalize_ls(expected), normalize_ls(result))
+    
+    def test_ls4(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, 'a/')
+        self.assertEqual(normalize_ls(expected), normalize_ls(result))
+    
+    def test_diff1(self):
+        diff = self.repo.diff(self.rev0, self.rev1, 'a/b')
+        self.assertTrue(len(diff) > 0)
+
 if __name__ == '__main__':
     unittest.main()
 
