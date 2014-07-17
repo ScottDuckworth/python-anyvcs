@@ -664,7 +664,7 @@ class DeletedFilesTest(object):
         cls.rev1 = cls.getAbsoluteRev()
 
         with open(a, 'w') as f:
-            f.write('foo')
+            f.write('foo\n')
         yield Commit('create a')
         cls.rev2 = cls.getAbsoluteRev()
 
