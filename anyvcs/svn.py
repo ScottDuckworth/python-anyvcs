@@ -59,7 +59,7 @@ def _add_diff_prefix(diff, a='a', b='b'):
 
 
 def _join(*args):
-    return '/'.join(args)
+    return '/'.join(arg for arg in args if arg)
 
 class SvnRepo(VCSRepo):
     """A Subversion repository
@@ -525,28 +525,46 @@ class SvnRepo(VCSRepo):
         except PathDoesNotExist:
             return ''
 
-    def diff(self, rev_a, rev_b, path=None):
+    def _diff(self, rev_a, rev_b, path, diff_a='a', diff_b='b'):
         entry_a = not path or self._exists(rev_a, path)
         entry_b = not path or self._exists(rev_b, path)
         if not entry_a and not entry_b:
             return ''
         elif not entry_a or not entry_b:
-            a = self._diff_read(rev_a, path).splitlines(True)
-            b = self._diff_read(rev_b, path).splitlines(True)
-            _, prefix_a = self._maprev(rev_a)
-            _, prefix_b = self._maprev(rev_b)
-            path_a = _join(prefix_a.lstrip('/'), path)
-            path_b = _join(prefix_b.lstrip('/'), path)
-            diff = difflib.unified_diff(a, b,
-                                        fromfile='a/' + path_a,
-                                        tofile='b/' + path_b)
-            return ''.join(diff)
+            if (
+                entry_a and entry_a.type != 'd' or
+                entry_b and entry_b.type != 'd'
+            ):
+                a = self._diff_read(rev_a, path).splitlines(True)
+                b = self._diff_read(rev_b, path).splitlines(True)
+                _, prefix_a = self._maprev(rev_a)
+                _, prefix_b = self._maprev(rev_b)
+                path_a = _join(diff_a, prefix_a.strip('/'), path.lstrip('/')) \
+                         if entry_a else os.devnull
+                path_b = _join(diff_b, prefix_b.strip('/'), path.lstrip('/')) \
+                         if entry_b else os.devnull
+                diff = difflib.unified_diff(a, b,
+                                            fromfile=path_a,
+                                            tofile=path_b)
+                return ''.join(diff)
+            elif entry_a:
+                contents = self.ls(rev_a, path)
+            else:  # entry_b
+                assert entry_b
+                contents = self.ls(rev_b, path)
+            return ''.join(
+                self._diff(rev_a, rev_b, entry.path, diff_a, diff_b)
+                for entry in contents
+            )
         else:
             url_a = self._compose_url(rev=rev_a, path=path)
             url_b = self._compose_url(rev=rev_b, path=path)
             cmd = [SVN, 'diff', url_a, url_b]
             output = self._command(cmd).decode(self.encoding)
             return _add_diff_prefix(output)
+
+    def diff(self, rev_a, rev_b, path=None):
+        return self._diff(rev_a, rev_b, path)
 
     def changed(self, rev):
         rev, prefix = self._maprev(rev)
