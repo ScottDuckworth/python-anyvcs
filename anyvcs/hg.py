@@ -441,13 +441,13 @@ class HgRepo(VCSRepo):
 
     def pdiff(self, rev):
         cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
-        return self._command(cmd)[1:]
+        return self._command(cmd)[1:].decode(self.encoding)
 
     def diff(self, rev_a, rev_b, path=None):
         cmd = [HG, 'diff', '-r', rev_a, '-r', rev_b]
         if path is not None:
             cmd.extend(['--', type(self).cleanPath(path)])
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def ancestor(self, rev1, rev2):
         cmd = [HG, 'log', '--template={node}', '-r', 'ancestor(%s, %s)' % (rev1, rev2)]
