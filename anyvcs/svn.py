@@ -66,6 +66,7 @@ def _add_diff_prefix(diff, a='a', b='b'):
 def _join(*args):
     return '/'.join(arg for arg in args if arg)
 
+
 class SvnRepo(VCSRepo):
     """A Subversion repository
 
@@ -495,7 +496,6 @@ class SvnRepo(VCSRepo):
         cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
         output = self._command(cmd)
         return _add_diff_prefix(output.decode(self.encoding))
-
 
     def _compose_url(self, rev=None, path=None, proto='file'):
         url = '%s://%s' % (proto, self.path)
