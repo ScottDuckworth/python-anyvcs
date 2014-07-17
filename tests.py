@@ -49,6 +49,13 @@ keep_test_dir = False
 logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
+try:
+    # Python 2.X
+    string_types = (basestring,)
+except NameError:
+    # Python 3.X
+    string_types = (str,)
+
 # to use for encoding tests
 aenema_utf8_encoded = b'\xc3\x86nema'
 aenema = aenema_utf8_encoded.decode('utf-8')
@@ -614,6 +621,7 @@ class SvnEmptyTest(SvnTest, EmptyTest):
         os.mkdir(path_a)
         self.export(0, path_b)
         pdiff = self.repo.pdiff(0)
+        self.assertIsInstance(pdiff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
         p.communicate(pdiff)
         self.assertEqual(0, p.returncode)
@@ -699,11 +707,13 @@ class MismatchedFileTypeTest(object):
 
     def test_diff_exists_to_not_exists(self):
         diff = self.repo.diff(self.rev1, self.rev2, 'a')
+        self.assertIsInstance(diff, string_types)
         diff = ''.join(line for line in diff.splitlines(True)
                        if line[0] == '-' and
                           line[1] != '-')
         self.assertEqual('-foo\n', diff)
         diff = self.repo.diff(self.rev2, self.rev1, 'a')
+        self.assertIsInstance(diff, string_types)
         diff = ''.join(line for line in diff.splitlines(True)
                        if line[0] == '+' and
                           line[1] != '+')
@@ -711,15 +721,21 @@ class MismatchedFileTypeTest(object):
 
     def test_diff_file_to_link(self):
         diff = self.repo.diff(self.rev1, self.rev2, 'b')
+        self.assertIsInstance(diff, string_types)
         diff = self.repo.diff(self.rev2, self.rev1, 'b')
+        self.assertIsInstance(diff, string_types)
 
     def test_diff_file_to_dir(self):
         diff = self.repo.diff(self.rev1, self.rev2, 'c')
+        self.assertIsInstance(diff, string_types)
         diff = self.repo.diff(self.rev2, self.rev1, 'c')
+        self.assertIsInstance(diff, string_types)
 
     def test_diff_link_to_dir(self):
         diff = self.repo.diff(self.rev1, self.rev2, 'd')
+        self.assertIsInstance(diff, string_types)
         diff = self.repo.diff(self.rev2, self.rev1, 'd')
+        self.assertIsInstance(diff, string_types)
 
 
 class GitMismatchedFileTypeTest(GitTest, MismatchedFileTypeTest):
@@ -1111,6 +1127,7 @@ class BasicTest(object):
         os.mkdir(path_a)
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.rev1)
+        self.assertIsInstance(pdiff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
         p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
@@ -1133,6 +1150,7 @@ class BasicTest(object):
         os.mkdir(path_a)
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.main_branch)
+        self.assertIsInstance(pdiff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
         p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
@@ -1701,6 +1719,7 @@ class BranchTestStep7(object):
         self.export(self.main_branch, path_a)
         self.export(branch1a, path_b)
         diff = self.repo.diff(self.main_branch, branch1a)
+        self.assertIsInstance(diff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
         p.communicate(diff)
         self.assertEqual(0, p.returncode)
@@ -2583,6 +2602,7 @@ class SvnHeadRevTest(SvnTest):
     
     def test_diff1(self):
         diff = self.repo.diff(self.rev0, self.rev1, 'a/b')
+        self.assertIsInstance(diff, string_types)
         self.assertTrue(len(diff) > 0)
 
 if __name__ == '__main__':
