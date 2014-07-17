@@ -29,6 +29,7 @@
 import difflib
 import collections
 import fnmatch
+import hashlib
 import re
 import subprocess
 import sys
@@ -39,6 +40,10 @@ DIFF = 'diff'
 SVN = 'svn'
 SVNADMIN = 'svnadmin'
 SVNLOOK = 'svnlook'
+
+BINARY_DIFF = """\
+Binary files {fromfile} and {tofile} differ
+"""
 
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
@@ -516,14 +521,21 @@ class SvnRepo(VCSRepo):
         try:
             entry = self.ls(rev, path, directory=True)[0]
             if entry.type == 'f':
-                return self.cat(rev, path).decode(self.encoding)
+                contents = self.cat(rev, path)
+                h = hashlib.sha1(contents).hexdigest
+                # Catch the common base class of encoding errors which is
+                # unfortunately ValueError.
+                try:
+                    return contents.decode(self.encoding), h
+                except ValueError:
+                    return None, h
             elif entry.type == 'l':
-                return 'link %s\n' % self.readlink(rev, path)
+                return 'link %s\n' % self.readlink(rev, path), None
             else:
                 assert entry.type == 'd'
-                return 'directory\n'
+                return 'directory\n', None
         except PathDoesNotExist:
-            return ''
+            return '', None
 
     def _diff(self, rev_a, rev_b, path, diff_a='a', diff_b='b'):
         entry_a = not path or self._exists(rev_a, path)
@@ -535,17 +547,25 @@ class SvnRepo(VCSRepo):
                 entry_a and entry_a.type != 'd' or
                 entry_b and entry_b.type != 'd'
             ):
-                a = self._diff_read(rev_a, path).splitlines(True)
-                b = self._diff_read(rev_b, path).splitlines(True)
                 _, prefix_a = self._maprev(rev_a)
                 _, prefix_b = self._maprev(rev_b)
-                path_a = _join(diff_a, prefix_a.strip('/'), path.lstrip('/')) \
-                         if entry_a else os.devnull
-                path_b = _join(diff_b, prefix_b.strip('/'), path.lstrip('/')) \
+                prefix_a, prefix_b = prefix_a.strip('/'), prefix_b.strip('/')
+                fromfile = _join(diff_a, prefix_a, path.lstrip('/')) \
+                           if entry_a else os.devnull
+                tofile = _join(diff_b, prefix_b, path.lstrip('/')) \
                          if entry_b else os.devnull
+                a, hasha = self._diff_read(rev_a, path)
+                b, hashb = self._diff_read(rev_b, path)
+                if a is None or b is None:
+                    if hasha == hashb:
+                        return ''
+                    else:
+                        return BINARY_DIFF.format(fromfile=fromfile,
+                                                  tofile=tofile)
+                a, b = a.splitlines(True), b.splitlines(True)
                 diff = difflib.unified_diff(a, b,
-                                            fromfile=path_a,
-                                            tofile=path_b)
+                                            fromfile=fromfile,
+                                            tofile=tofile)
                 return ''.join(diff)
             elif entry_a:
                 contents = self.ls(rev_a, path)
