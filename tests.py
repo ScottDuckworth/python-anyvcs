@@ -91,6 +91,12 @@ def normalize_logmsg(x):
     return x.rstrip()
 
 
+def touch(path, contents=None):
+    with open(path, 'w') as f:
+        if not contents is None:
+            f.write(contents)
+
+
 ### VCS FRAMEWORK CLASSES ###
 
 class VCSTest(unittest.TestCase):
@@ -650,52 +656,81 @@ class SvnEmptyWithCommitsTest(SvnTest, EmptyWithCommitsTest):
     pass
 
 
-### TEST CASE: DeletedFilesTest ###
+### TEST CASE: MismatchedFileTypeTest ###
 
-class DeletedFilesTest(object):
+class MismatchedFileTypeTest(object):
+    """ Test operations involving mismatched file types.
+
+    The first commit (cls.rev1) sets up the initial snapshot for the directory.
+    A transition commit deletes any files in the first. Finally, the files are
+    changed to their destination type (cls.rev2).
+
+    File list:
+        - a: exists to not exists
+        - b: file to link
+        - c: file to dir
+        - d: link to dir
+
+    """
     @classmethod
     def setUpWorkingCopy(cls, working_path):
-        placeholder = os.path.join(working_path, 'placeholder')
-        a = os.path.join(working_path, 'a')
+        a, b, c, d = [os.path.join(working_path, char) for char in 'abcd']
 
-        with open(placeholder, 'w') as f:
-            pass
-        yield Commit('placeholder commit')
+        touch(a, 'foo\n')
+        touch(b, 'foo\n')
+        touch(c, 'foo\n')
+        os.symlink('target', d)
+        yield Commit('initial snapshot')
         cls.rev1 = cls.getAbsoluteRev()
 
-        with open(a, 'w') as f:
-            f.write('foo\n')
-        yield Commit('create a')
+        os.unlink(a)
+        os.unlink(b)
+        os.unlink(c)
+        os.unlink(d)
+        yield Commit('transition commit')
+
+        os.symlink('target', b)
+        os.mkdir(c)
+        os.mkdir(d)
+        touch(os.path.join(c, 'c'))
+        touch(os.path.join(d, 'd'))
+        yield Commit('final state')
         cls.rev2 = cls.getAbsoluteRev()
 
-        os.unlink(a)
-        yield Commit('delete a')
-        cls.rev3 = cls.getAbsoluteRev()
-
-    def test_diff_created(self):
+    def test_diff_exists_to_not_exists(self):
         diff = self.repo.diff(self.rev1, self.rev2, 'a')
+        diff = ''.join(line for line in diff.splitlines(True)
+                       if line[0] == '-' and
+                          line[1] != '-')
+        self.assertEqual('-foo\n', diff)
+        diff = self.repo.diff(self.rev2, self.rev1, 'a')
         diff = ''.join(line for line in diff.splitlines(True)
                        if line[0] == '+' and
                           line[1] != '+')
         self.assertEqual('+foo\n', diff)
 
-    def test_diff_deleted(self):
-        diff = self.repo.diff(self.rev2, self.rev3, 'a')
-        diff = ''.join(line for line in diff.splitlines(True)
-                       if line[0] == '-' and
-                          line[1] != '-')
-        self.assertEqual('-foo\n', diff)
+    def test_diff_file_to_link(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'b')
+        diff = self.repo.diff(self.rev2, self.rev1, 'b')
+
+    def test_diff_file_to_dir(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'c')
+        diff = self.repo.diff(self.rev2, self.rev1, 'c')
+
+    def test_diff_link_to_dir(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'd')
+        diff = self.repo.diff(self.rev2, self.rev1, 'd')
 
 
-class GitDeletedFilesTest(GitTest, DeletedFilesTest):
+class GitMismatchedFileTypeTest(GitTest, MismatchedFileTypeTest):
     pass
 
 
-class HgDeletedFilesTest(HgTest, DeletedFilesTest):
+class HgMismatchedFileTypeTest(HgTest, MismatchedFileTypeTest):
     pass
 
 
-class SvnDeletedFilesTest(SvnTest, DeletedFilesTest):
+class SvnMismatchedFileTypeTest(SvnTest, MismatchedFileTypeTest):
     pass
 
 
