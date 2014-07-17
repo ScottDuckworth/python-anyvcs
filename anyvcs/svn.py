@@ -48,12 +48,12 @@ HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
 
 
 def _add_diff_prefix(diff, a='a', b='b'):
-    output = b''
+    output = ''
     for line in diff.splitlines(True):
-        if line.startswith(b'--- '):
-            line = b'--- %s/' % a + line[4:]
-        if line.startswith(b'+++ '):
-            line = b'+++ %s/' % b + line[4:]
+        if line.startswith('--- '):
+            line = '--- ' + a + '/' + line[4:]
+        if line.startswith('+++ '):
+            line = '+++ ' + b + '/' + line[4:]
         output += line
     return output
 
@@ -489,7 +489,7 @@ class SvnRepo(VCSRepo):
             return ''
         cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
         output = self._command(cmd)
-        return _add_diff_prefix(output)
+        return _add_diff_prefix(output.decode(self.encoding))
 
 
     def _compose_url(self, rev=None, path=None, proto='file'):
@@ -516,20 +516,20 @@ class SvnRepo(VCSRepo):
         try:
             entry = self.ls(rev, path, directory=True)[0]
             if entry.type == 'f':
-                return self.cat(rev, path)
+                return self.cat(rev, path).decode(self.encoding)
             elif entry.type == 'l':
-                return b'link %s\n' % self.readlink(rev, path)
+                return 'link %s\n' % self.readlink(rev, path)
             else:
                 assert entry.type == 'd'
-                return b'directory\n'
+                return 'directory\n'
         except PathDoesNotExist:
-            return b''
+            return ''
 
     def diff(self, rev_a, rev_b, path=None):
         entry_a = not path or self._exists(rev_a, path)
         entry_b = not path or self._exists(rev_b, path)
         if not entry_a and not entry_b:
-            return b''
+            return ''
         elif not entry_a or not entry_b:
             a = self._diff_read(rev_a, path).splitlines(True)
             b = self._diff_read(rev_b, path).splitlines(True)
@@ -545,7 +545,7 @@ class SvnRepo(VCSRepo):
             url_a = self._compose_url(rev=rev_a, path=path)
             url_b = self._compose_url(rev=rev_b, path=path)
             cmd = [SVN, 'diff', url_a, url_b]
-            output = self._command(cmd).decode()
+            output = self._command(cmd).decode(self.encoding)
             return _add_diff_prefix(output)
 
     def changed(self, rev):

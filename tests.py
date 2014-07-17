@@ -1112,7 +1112,7 @@ class BasicTest(object):
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.rev1)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-        p.communicate(pdiff)
+        p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
         # symlinks are not reconstructed by patch, so just make sure the file exists
         # then remove it so that diff works
@@ -1134,7 +1134,7 @@ class BasicTest(object):
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.main_branch)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-        p.communicate(pdiff)
+        p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
         # symlinks are not reconstructed by patch, so just make sure the file exists
         # then remove it so that diff works
