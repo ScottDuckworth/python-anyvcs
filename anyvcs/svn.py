@@ -58,6 +58,9 @@ def _add_diff_prefix(diff, a='a', b='b'):
     return output
 
 
+def _join(*args):
+    return '/'.join(args)
+
 class SvnRepo(VCSRepo):
     """A Subversion repository
 
@@ -169,7 +172,7 @@ class SvnRepo(VCSRepo):
         if path is None:
             return self._proplist(str(rev), None)
         else:
-            path = type(self).cleanPath(prefix + path)
+            path = type(self).cleanPath(_join(prefix, path))
             return self._proplist(str(rev), path)
 
     def _propget(self, prop, rev, path):
@@ -182,7 +185,7 @@ class SvnRepo(VCSRepo):
         if path is None:
             return self._propget(prop, str(rev), None)
         else:
-            path = type(self).cleanPath(prefix + path)
+            path = type(self).cleanPath(_join(prefix, path))
             return self._propget(prop, str(rev), path)
 
     def _mergeinfo(self, rev, path):
@@ -236,7 +239,7 @@ class SvnRepo(VCSRepo):
     ):
         rev, prefix = self._maprev(rev)
         revstr = str(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         forcedir = False
         if path.endswith('/'):
             forcedir = True
@@ -314,7 +317,7 @@ class SvnRepo(VCSRepo):
 
     def cat(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'f':
@@ -329,7 +332,7 @@ class SvnRepo(VCSRepo):
 
     def readlink(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'l':
@@ -532,8 +535,8 @@ class SvnRepo(VCSRepo):
             b = self._diff_read(rev_b, path).splitlines(True)
             _, prefix_a = self._maprev(rev_a)
             _, prefix_b = self._maprev(rev_b)
-            path_a = '/'.join([prefix_a.lstrip('/'), path])
-            path_b = '/'.join([prefix_b.lstrip('/'), path])
+            path_a = _join(prefix_a.lstrip('/'), path)
+            path_b = _join(prefix_b.lstrip('/'), path)
             diff = difflib.unified_diff(a, b,
                                         fromfile='a/' + path_a,
                                         tofile='b/' + path_b)
@@ -674,7 +677,7 @@ class SvnRepo(VCSRepo):
 
     def blame(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'f':
