@@ -114,6 +114,9 @@ class HgRepo(VCSRepo):
             cmd = [HG, 'log', '--template={node}', '-r', str(rev)]
             return self._command(cmd).decode()
 
+    def compose_rev(self, branch, rev):
+        return self.canonical_rev(rev)
+
     def _revnum(self, rev):
         if isinstance(rev, int):
             return rev

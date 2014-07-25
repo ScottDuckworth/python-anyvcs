@@ -218,6 +218,9 @@ class SvnRepo(VCSRepo):
             rev, prefix = self._maprev(rev)
             return rev
 
+    def compose_rev(self, branch, rev):
+        return '%s:%d' % (branch, self.canonical_rev(rev))
+
     def ls(
         self, rev, path, recursive=False, recursive_dirs=False,
         directory=False, report=()
