@@ -72,6 +72,19 @@ def parse_isodate(datestr):
     return dt
 
 
+def command(cmd, input=None, **kwargs):
+    try:
+        output = subprocess.check_output(cmd, **kwargs)
+        return output
+    except AttributeError:  # subprocess.check_output added in python 2.7
+        kwargs.setdefault('stdout', subprocess.PIPE)
+        p = subprocess.Popen(cmd, **kwargs)
+        stdout, stderr = p.communicate()
+        if p.returncode != 0:
+            raise subprocess.CalledProcessError(p.returncode, cmd)
+        return stdout
+
+
 class ABCMetaDocStringInheritor(ABCMeta):
     '''A variation on
     http://groups.google.com/group/comp.lang.python/msg/26f7b4fcb4d66c95
@@ -282,16 +295,7 @@ class VCSRepo(object):
 
     def _command(self, cmd, input=None, **kwargs):
         kwargs.setdefault('cwd', self.path)
-        try:
-            output = subprocess.check_output(cmd, **kwargs)
-            return output
-        except AttributeError:  # subprocess.check_output added in python 2.7
-            kwargs.setdefault('stdout', subprocess.PIPE)
-            p = subprocess.Popen(cmd, **kwargs)
-            stdout, stderr = p.communicate()
-            if p.returncode != 0:
-                raise subprocess.CalledProcessError(p.returncode, cmd)
-            return stdout
+        return command(cmd, **kwargs)
 
     @classmethod
     def cleanPath(cls, path):

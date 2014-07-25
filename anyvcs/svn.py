@@ -44,7 +44,7 @@ SVNLOOK = 'svnlook'
 # unicode characters in their numbering scheme.
 #
 SVN_VERSION = tuple(
-    subprocess.check_output([SVN, '--version', '--quiet'])
+    command([SVN, '--version', '--quiet'])
         .decode()
         .strip()
         .split('.')
