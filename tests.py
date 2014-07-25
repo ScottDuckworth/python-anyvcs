@@ -1185,6 +1185,17 @@ class SvnBasicTest(SvnTest, BasicTest):
         self.assertIsInstance(result[0].date, datetime.datetime)
         self.assertEqual('Pisgah'.encode(), result[0].line)
 
+    def test_proplist(self):
+        result = self.repo.proplist(self.rev1)
+        expected = sorted(['svn:log', 'svn:author', 'svn:date'])
+        self.assertEqual(expected, sorted(result))
+
+    def test_proplist_path(self):
+        result = self.repo.proplist(self.rev1, 'a')
+        expected = []
+        self.assertEqual(expected, result)
+
+
 ### TEST CASE: UnrelatedBranchTest ###
 
 
