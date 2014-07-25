@@ -305,6 +305,21 @@ class VCSRepo(object):
         raise NotImplementedError
 
     @abstractmethod
+    def compose_rev(self, branch, rev):
+        """ Compose a revision identifier which encodes branch and revision.
+
+        :param str branch: A branch name
+        :param rev: A revision (can be canonical or as constructed by
+                    :meth:`compose_rev()` or :meth:`tip()`)
+
+        The revision identifier encodes branch and revision information
+        according to the particular VCS type. This is a means to unify the
+        various branching models under a common interface.
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def ls(
         self, rev, path, recursive=False, recursive_dirs=False,
         directory=False, report=()
