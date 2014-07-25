@@ -1200,6 +1200,11 @@ class GitLikeBasicTest(BasicTest):
         self.assertIsInstance(result[0].date, datetime.datetime)
         self.assertEqual('Pisgah'.encode(), result[0].line)
 
+    def test_compose_rev(self):
+        result = self.repo.compose_rev(self.main_branch, self.rev1)
+        expected = self.rev1
+        self.assertEqual(expected, result)
+
 
 class GitBasicTest(GitTest, GitLikeBasicTest):
     def test_branches(self):
@@ -1286,6 +1291,28 @@ class SvnBasicTest(SvnTest, BasicTest):
         self.assertEqual(getpass.getuser(), result[0].author)
         self.assertIsInstance(result[0].date, datetime.datetime)
         self.assertEqual('Pisgah'.encode(), result[0].line)
+
+    def test_proplist(self):
+        result = self.repo.proplist(self.rev1)
+        expected = sorted(['svn:log', 'svn:author', 'svn:date'])
+        self.assertEqual(expected, sorted(result))
+
+    def test_proplist_path(self):
+        result = self.repo.proplist(self.rev1, 'a')
+        expected = []
+        self.assertEqual(expected, result)
+
+    def test_compose_rev1(self):
+        result = self.repo.compose_rev(self.main_branch, self.rev1)
+        expected = '%s:%d' % (self.main_branch, self.rev1)
+        self.assertEqual(expected, result)
+
+    def test_compose_rev2(self):
+        rev = '%s:%d' % (self.main_branch, self.rev1)
+        result = self.repo.compose_rev(self.main_branch, rev)
+        expected = rev
+        self.assertEqual(expected, result)
+
 
 ### TEST CASE: UnrelatedBranchTest ###
 

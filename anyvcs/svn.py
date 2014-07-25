@@ -45,6 +45,17 @@ BINARY_DIFF = """\
 Binary files {fromfile} and {tofile} differ
 """
 
+#
+# Using the ASCII codec here should be OK as long as Subversion never includes
+# unicode characters in their numbering scheme.
+#
+SVN_VERSION = tuple(
+    command([SVN, '--version', '--quiet'])
+        .decode()
+        .strip()
+        .split('.')
+)
+
 head_rev_rx = re.compile(r'^(?=.)(?P<head>\D[^:]*)?:?(?P<rev>\d+)?$')
 mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
 changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)\)$')
@@ -169,8 +180,15 @@ class SvnRepo(VCSRepo):
 
     def _proplist(self, rev, path):
         cmd = [SVNLOOK, 'proplist', '-r', rev, '.', path or '--revprop']
-        output = self._command(cmd).decode()
-        return [x.strip() for x in output.splitlines()]
+        output = self._command(cmd).decode(self.encoding)
+        props = [x.strip() for x in output.splitlines()]
+        #
+        # Subversion 1.8 adds extra user output when given a path argument.
+        #
+        if not path is None and SVN_VERSION >= ('1', '8'):
+            return props[1:]
+        else:
+            return props
 
     def proplist(self, rev, path=None):
         """List Subversion properties of the path"""
@@ -238,6 +256,9 @@ class SvnRepo(VCSRepo):
         else:
             rev, prefix = self._maprev(rev)
             return rev
+
+    def compose_rev(self, branch, rev):
+        return '%s:%d' % (branch, self.canonical_rev(rev))
 
     def ls(
         self, rev, path, recursive=False, recursive_dirs=False,
