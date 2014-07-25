@@ -305,7 +305,33 @@ class VCSRepo(object):
 
     @abstractmethod
     def canonical_rev(self, rev):
-        """Get the canonical revision identifier"""
+        """ Get the canonical revision identifier
+
+        :param rev: The revision to canonicalize.
+        :returns: The canonicalized revision
+
+        The canonical revision is the revision which is natively supported by
+        the underlying VCS type. In some cases, anyvcs may annotate a revision
+        identifier to also encode branch information which is not safe to use
+        directly with the VCS itself (e.g. as created by :meth:`compose_rev`).
+        This method is a means of converting back to canonical form.
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def compose_rev(self, branch, rev):
+        """ Compose a revision identifier which encodes branch and revision.
+
+        :param str branch: A branch name
+        :param rev: A revision (can be canonical or as constructed by
+                    :meth:`compose_rev()` or :meth:`tip()`)
+
+        The revision identifier encodes branch and revision information
+        according to the particular VCS type. This is a means to unify the
+        various branching models under a common interface.
+
+        """
         raise NotImplementedError
 
     @abstractmethod

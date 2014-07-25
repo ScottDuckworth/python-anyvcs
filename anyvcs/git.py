@@ -93,6 +93,9 @@ class GitRepo(VCSRepo):
             cmd = [GIT, 'rev-parse', rev]
             return self._command(cmd).decode().rstrip()
 
+    def compose_rev(self, branch, rev):
+        return self.canonical_rev(rev)
+
     def ls(
         self, rev, path, recursive=False, recursive_dirs=False,
         directory=False, report=()
