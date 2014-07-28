@@ -4,6 +4,8 @@ python:
   - "2.7"
   - "3.2"
   - "3.3"
+env:
+  - SUITE=
 install:
   - pip install .
   - sh ./.travis-requirements.sh
@@ -12,4 +14,4 @@ before_script:
   - hg --version --quiet
   - svn --version --quiet
 script:
-  - sh ./.travis-script.sh
+  - export TEST_LOG_FILE=`mktemp`; py.test $SUITE -v || (cat $TEST_LOG_FILE; false)
