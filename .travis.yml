@@ -16,4 +16,4 @@ before_script:
   - hg --version --quiet
   - svn --version --quiet
 script:
-  - export TEST_LOG_FILE=`mktemp`; py.test $SUITE -v || (cat $TEST_LOG_FILE; false)
+  - export PYTHONPATH=tests TEST_LOG_FILE=`mktemp`; py.test $SUITE -v || (cat $TEST_LOG_FILE; false)
