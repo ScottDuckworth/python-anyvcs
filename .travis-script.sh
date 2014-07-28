@@ -1,5 +1,18 @@
 #!/bin/sh
-set -ex
+set -x
+
+if [ "x${TEST_SCRIPTS}" = "x" ]; then
+  TEST_SCRIPTS=tests/test_*.py
+fi
 
 export TEST_LOG_FILE=`mktemp`
-python -m unittest tests.test_git tests.test_hg tests.test_git -v || (cat $TEST_LOG_FILE; false)
+status=0
+for script in ${TEST_SCRIPTS}; do
+  python "${script}"
+  status=$(( ${status} + $? ))
+done
+
+if [ ${status} -ne 0 ]; then
+  cat ${TEST_LOG_FILE}
+fi
+exit ${status}
