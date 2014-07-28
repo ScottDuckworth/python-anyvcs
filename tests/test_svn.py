@@ -473,3 +473,7 @@ class SvnUTF8EncodingTest(SvnTest, common.UTF8EncodingTest):
 
 class SvnCopyTest(SvnTest, common.CopyTest):
     pass
+
+
+if __name__ == "__main__":
+    common.unittest.main()

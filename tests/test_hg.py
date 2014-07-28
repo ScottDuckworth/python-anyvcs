@@ -171,3 +171,7 @@ class HgUTF8EncodingTest(HgTest, common.UTF8EncodingTest):
 
 class HgCopyTest(HgTest, common.CopyTest):
     pass
+
+
+if __name__ == "__main__":
+    common.unittest.main()

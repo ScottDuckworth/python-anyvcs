@@ -156,3 +156,7 @@ class GitUTF8EncodingTest(GitTest, common.UTF8EncodingTest):
 
 class GitCopyTest(GitTest, common.CopyTest):
     pass
+
+
+if __name__ == "__main__":
+    common.unittest.main()
