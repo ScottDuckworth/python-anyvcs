@@ -5,7 +5,9 @@ python:
   - "3.2"
   - "3.3"
 env:
-  - SUITE=
+  - SUITE=test/test_git.py
+  - SUITE=test/test_svn.py
+  - SUITE=test/test_hg.py
 install:
   - pip install .
   - sh ./.travis-requirements.sh
