@@ -26,8 +26,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import difflib
 import collections
 import fnmatch
+import hashlib
 import re
 import subprocess
 import sys
@@ -38,6 +40,10 @@ DIFF = 'diff'
 SVN = 'svn'
 SVNADMIN = 'svnadmin'
 SVNLOOK = 'svnlook'
+
+BINARY_DIFF = """\
+Binary files {fromfile} and {tofile} differ
+"""
 
 #
 # Using the ASCII codec here should be OK as long as Subversion never includes
@@ -55,6 +61,21 @@ mergeinfo_rx = re.compile(r'^(?P<head>.+):(?P<minrev>\d+)(?:-(?P<maxrev>\d+))$')
 changed_copy_info_rx = re.compile(r'^[ ]{4}\(from (?P<src>.+)\)$')
 
 HistoryEntry = collections.namedtuple('HistoryEntry', 'rev path')
+
+
+def _add_diff_prefix(diff, a='a', b='b'):
+    output = ''
+    for line in diff.splitlines(True):
+        if line.startswith('--- '):
+            line = '--- ' + a + '/' + line[4:]
+        if line.startswith('+++ '):
+            line = '+++ ' + b + '/' + line[4:]
+        output += line
+    return output
+
+
+def _join(*args):
+    return '/'.join(arg for arg in args if arg)
 
 
 class SvnRepo(VCSRepo):
@@ -175,7 +196,7 @@ class SvnRepo(VCSRepo):
         if path is None:
             return self._proplist(str(rev), None)
         else:
-            path = type(self).cleanPath(prefix + path)
+            path = type(self).cleanPath(_join(prefix, path))
             return self._proplist(str(rev), path)
 
     def _propget(self, prop, rev, path):
@@ -188,7 +209,7 @@ class SvnRepo(VCSRepo):
         if path is None:
             return self._propget(prop, str(rev), None)
         else:
-            path = type(self).cleanPath(prefix + path)
+            path = type(self).cleanPath(_join(prefix, path))
             return self._propget(prop, str(rev), path)
 
     def _mergeinfo(self, rev, path):
@@ -245,7 +266,7 @@ class SvnRepo(VCSRepo):
     ):
         rev, prefix = self._maprev(rev)
         revstr = str(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         forcedir = False
         if path.endswith('/'):
             forcedir = True
@@ -323,7 +344,7 @@ class SvnRepo(VCSRepo):
 
     def cat(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'f':
@@ -338,7 +359,7 @@ class SvnRepo(VCSRepo):
 
     def readlink(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'l':
@@ -495,45 +516,96 @@ class SvnRepo(VCSRepo):
             return ''
         cmd = [SVNLOOK, 'diff', '.', '-r', str(rev)]
         output = self._command(cmd)
-        _output = b''
-        for line in output.splitlines(True):
-            if line.startswith(b'--- '):
-                line = b'--- a/' + line[4:]
-            if line.startswith(b'+++ '):
-                line = b'+++ b/' + line[4:]
-            _output += line
-        output = _output
-        return output
+        return _add_diff_prefix(output.decode(self.encoding))
+
+    def _compose_url(self, rev=None, path=None, proto='file'):
+        url = '%s://%s' % (proto, self.path)
+        rev, prefix = self._maprev(rev)
+        path = path or ''
+        path = path.lstrip('/')
+        prefix = prefix.lstrip('/')
+        if prefix:
+            url = '%s/%s' % (url, prefix)
+        if path:
+            url = '%s/%s' % (url, path)
+        if not rev is None:
+            url = '%s@%d' % (url, rev)
+        return url
+
+    def _exists(self, rev, path):
+        try:
+            return self.ls(rev, path, directory=True)[0]
+        except PathDoesNotExist:
+            return False
+
+    def _diff_read(self, rev, path):
+        try:
+            entry = self.ls(rev, path, directory=True)[0]
+            if entry.type == 'f':
+                contents = self.cat(rev, path)
+                h = hashlib.sha1(contents).hexdigest
+                # Catch the common base class of encoding errors which is
+                # unfortunately ValueError.
+                try:
+                    return contents.decode(self.encoding), h
+                except ValueError:
+                    return None, h
+            elif entry.type == 'l':
+                return 'link %s\n' % self.readlink(rev, path), None
+            else:
+                assert entry.type == 'd'
+                return 'directory\n', None
+        except PathDoesNotExist:
+            return '', None
+
+    def _diff(self, rev_a, rev_b, path, diff_a='a', diff_b='b'):
+        entry_a = not path or self._exists(rev_a, path)
+        entry_b = not path or self._exists(rev_b, path)
+        if not entry_a and not entry_b:
+            return ''
+        elif not entry_a or not entry_b:
+            if (
+                entry_a and entry_a.type != 'd' or
+                entry_b and entry_b.type != 'd'
+            ):
+                _, prefix_a = self._maprev(rev_a)
+                _, prefix_b = self._maprev(rev_b)
+                prefix_a, prefix_b = prefix_a.strip('/'), prefix_b.strip('/')
+                fromfile = _join(diff_a, prefix_a, path.lstrip('/')) \
+                           if entry_a else os.devnull
+                tofile = _join(diff_b, prefix_b, path.lstrip('/')) \
+                         if entry_b else os.devnull
+                a, hasha = self._diff_read(rev_a, path)
+                b, hashb = self._diff_read(rev_b, path)
+                if a is None or b is None:
+                    if hasha == hashb:
+                        return ''
+                    else:
+                        return BINARY_DIFF.format(fromfile=fromfile,
+                                                  tofile=tofile)
+                a, b = a.splitlines(True), b.splitlines(True)
+                diff = difflib.unified_diff(a, b,
+                                            fromfile=fromfile,
+                                            tofile=tofile)
+                return ''.join(diff)
+            elif entry_a:
+                contents = self.ls(rev_a, path)
+            else:  # entry_b
+                assert entry_b
+                contents = self.ls(rev_b, path)
+            return ''.join(
+                self._diff(rev_a, rev_b, entry.path, diff_a, diff_b)
+                for entry in contents
+            )
+        else:
+            url_a = self._compose_url(rev=rev_a, path=path)
+            url_b = self._compose_url(rev=rev_b, path=path)
+            cmd = [SVN, 'diff', url_a, url_b]
+            output = self._command(cmd).decode(self.encoding)
+            return _add_diff_prefix(output)
 
     def diff(self, rev_a, rev_b, path=None):
-        import os
-        import shutil
-        import tempfile
-
-        rev_a, prefix_a = self._maprev(rev_a)
-        rev_b, prefix_b = self._maprev(rev_b)
-        tmpdir = tempfile.mkdtemp(prefix='anyvcs-svn-diff.')
-        try:
-            path_a = os.path.join(tmpdir, 'a')
-            path_b = os.path.join(tmpdir, 'b')
-            url_a = 'file://%s/%s@%d' % (self.path, prefix_a, rev_a)
-            url_b = 'file://%s/%s@%d' % (self.path, prefix_b, rev_b)
-            cmd = [SVN, 'export', '-q', url_a, path_a]
-            subprocess.check_call(cmd)
-            cmd = [SVN, 'export', '-q', url_b, path_b]
-            subprocess.check_call(cmd)
-            if path is None:
-                cmd = [DIFF, '-urN', 'a', 'b']
-            else:
-                path = type(self).cleanPath(path)
-                cmd = [DIFF, '-urN', 'a' + path, 'b' + path]
-            p = subprocess.Popen(cmd, cwd=tmpdir, stdout=subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            if p.returncode not in (0, 1):
-                raise subprocess.CalledProcessError(p.returncode, cmd, stdout)
-            return stdout
-        finally:
-            shutil.rmtree(tmpdir)
+        return self._diff(rev_a, rev_b, path)
 
     def changed(self, rev):
         rev, prefix = self._maprev(rev)
@@ -664,7 +736,7 @@ class SvnRepo(VCSRepo):
 
     def blame(self, rev, path):
         rev, prefix = self._maprev(rev)
-        path = type(self).cleanPath(prefix + path)
+        path = type(self).cleanPath(_join(prefix, path))
         ls = self.ls(rev, path, directory=True)
         assert len(ls) == 1
         if ls[0].get('type') != 'f':
