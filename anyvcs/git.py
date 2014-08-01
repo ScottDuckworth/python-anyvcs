@@ -40,12 +40,13 @@ branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 
 
 def readuntil(f, stop):
-  buf = bytes()
-  while True:
-    b = f.read(1)
-    if b == stop or not b:
-      return buf
-    buf += b
+    buf = bytes()
+    while True:
+        b = f.read(1)
+        if b == stop or not b:
+            return buf
+        buf += b
+
 
 class GitRepo(VCSRepo):
     """A git repository
@@ -186,7 +187,7 @@ class GitRepo(VCSRepo):
                     if not recursive:
                         d = f[len(path):].find(b'/')
                         if d != -1:
-                            f = f[:len(path)+d]
+                            f = f[:len(path) + d]
                     if f in files:
                         files[f].commit = commit.decode()
                         del files[f]
@@ -340,13 +341,13 @@ class GitRepo(VCSRepo):
 
     def pdiff(self, rev):
         cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def diff(self, rev_a, rev_b, path=None):
         cmd = [GIT, 'diff', rev_a, rev_b]
         if path is not None:
             cmd.extend(['--', type(self).cleanPath(path)])
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def ancestor(self, rev1, rev2):
         cmd = [GIT, 'merge-base', rev1, rev2]

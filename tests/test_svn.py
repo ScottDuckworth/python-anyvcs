@@ -140,6 +140,10 @@ class SvnEmptyWithCommitsTest(SvnTest, common.EmptyWithCommitsTest):
     pass
 
 
+class SvnMismatchedFileTypeTest(SvnTest, common.MismatchedFileTypeTest):
+    pass
+
+
 class SvnBasicTest(SvnTest, common.BasicTest):
     def test_branches(self):
         result = self.repo.branches()
@@ -473,6 +477,60 @@ class SvnUTF8EncodingTest(SvnTest, common.UTF8EncodingTest):
 
 class SvnCopyTest(SvnTest, common.CopyTest):
     pass
+
+
+### TEST CASE: SvnHeadRevTest ###
+
+class SvnHeadRevTest(SvnTest):
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        yield common.CreateStandardDirectoryStructure()
+        cls.rev0 = cls.getAbsoluteRev()
+
+        os.makedirs(os.path.join(working_path, 'a'))
+        common.touch(os.path.join(working_path, 'a', 'b'), 'foo\n')
+        yield common.Commit('create a/b')
+        cls.rev1 = cls.getAbsoluteRev()
+
+    def test_ls1(self):
+        expected = [
+            {'name': 'a', 'path': 'trunk/a', 'type': 'd'},
+        ]
+        result = self.repo.ls(self.rev1, '')
+        self.assertEqual(common.normalize_ls(expected), common.normalize_ls(result))
+
+    def test_ls2(self):
+        expected = [
+            {'name': 'a', 'path': 'trunk/a', 'type': 'd'},
+        ]
+        result = self.repo.ls(self.rev1, '/')
+        self.assertEqual(common.normalize_ls(expected), common.normalize_ls(result))
+
+    def test_ls3(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, '/a')
+        self.assertEqual(common.normalize_ls(expected), common.normalize_ls(result))
+
+    def test_ls3(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, 'a')
+        self.assertEqual(common.normalize_ls(expected), common.normalize_ls(result))
+
+    def test_ls4(self):
+        expected = [
+            {'name': 'b', 'path': 'trunk/a/b', 'type': 'f'},
+        ]
+        result = self.repo.ls(self.rev1, 'a/')
+        self.assertEqual(common.normalize_ls(expected), common.normalize_ls(result))
+
+    def test_diff1(self):
+        diff = self.repo.diff(self.rev0, self.rev1, 'a/b')
+        self.assertIsInstance(diff, common.string_types)
+        self.assertTrue(len(diff) > 0)
 
 
 if __name__ == "__main__":

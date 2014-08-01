@@ -522,7 +522,7 @@ class VCSRepo(object):
         :returns str: The diff.
 
         The returned string contains the unified diff from rev_a to rev_b with
-        a prefix of one (suitable for input to patch -p1). 
+        a prefix of one (suitable for input to patch -p1).
         """
         raise NotImplementedError
 

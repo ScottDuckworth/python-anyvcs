@@ -94,6 +94,10 @@ class HgEmptyWithCommitsTest(HgTest, common.EmptyWithCommitsTest):
     pass
 
 
+class HgMismatchedFileTypeTest(HgTest, common.MismatchedFileTypeTest):
+    pass
+
+
 class HgEmptyMainBranchTest(HgTest, common.EmptyMainBranchTest):
     pass
 

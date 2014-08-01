@@ -91,6 +91,10 @@ class GitEmptyWithCommitsTest(GitTest, common.EmptyWithCommitsTest):
     pass
 
 
+class GitMismatchedFileTypeTest(GitTest, common.MismatchedFileTypeTest):
+    pass
+
+
 class GitEmptyMainBranchTest(GitTest, common.EmptyMainBranchTest):
     pass
 

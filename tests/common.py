@@ -48,6 +48,13 @@ keep_test_dir = False
 logfile = open(os.getenv('TEST_LOG_FILE', os.devnull), 'a')
 UTC = UTCOffset(0, 'UTC')
 
+try:
+    # Python 2.X
+    string_types = (basestring,)
+except NameError:
+    # Python 3.X
+    string_types = (str,)
+
 # to use for encoding tests
 aenema_utf8_encoded = b'\xc3\x86nema'
 aenema = aenema_utf8_encoded.decode('utf-8')
@@ -88,6 +95,12 @@ def normalize_datetime(x):
 
 def normalize_logmsg(x):
     return x.rstrip()
+
+
+def touch(path, contents=None):
+    with open(path, 'w') as f:
+        if not contents is None:
+            f.write(contents)
 
 
 ### VCS FRAMEWORK CLASSES ###
@@ -426,6 +439,80 @@ class EmptyWithCommitsTest(object):
         result = self.repo.ls(self.main_branch, '')
         correct = []
         self.assertEqual(normalize_ls(correct), normalize_ls(result))
+
+
+### TEST CASE: MismatchedFileTypeTest ###
+
+class MismatchedFileTypeTest(object):
+    """ Test operations involving mismatched file types.
+
+    The first commit (cls.rev1) sets up the initial snapshot for the directory.
+    A transition commit deletes any files in the first. Finally, the files are
+    changed to their destination type (cls.rev2).
+
+    File list:
+        - a: exists to not exists
+        - b: file to link
+        - c: file to dir
+        - d: link to dir
+
+    """
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        a, b, c, d = [os.path.join(working_path, char) for char in 'abcd']
+
+        touch(a, 'foo\n')
+        touch(b, 'foo\n')
+        touch(c, 'foo\n')
+        os.symlink('target', d)
+        yield Commit('initial snapshot')
+        cls.rev1 = cls.getAbsoluteRev()
+
+        os.unlink(a)
+        os.unlink(b)
+        os.unlink(c)
+        os.unlink(d)
+        yield Commit('transition commit')
+
+        os.symlink('target', b)
+        os.mkdir(c)
+        os.mkdir(d)
+        touch(os.path.join(c, 'c'))
+        touch(os.path.join(d, 'd'))
+        yield Commit('final state')
+        cls.rev2 = cls.getAbsoluteRev()
+
+    def test_diff_exists_to_not_exists(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'a')
+        self.assertIsInstance(diff, string_types)
+        diff = ''.join(line for line in diff.splitlines(True)
+                       if line[0] == '-' and
+                          line[1] != '-')
+        self.assertEqual('-foo\n', diff)
+        diff = self.repo.diff(self.rev2, self.rev1, 'a')
+        self.assertIsInstance(diff, string_types)
+        diff = ''.join(line for line in diff.splitlines(True)
+                       if line[0] == '+' and
+                          line[1] != '+')
+        self.assertEqual('+foo\n', diff)
+
+    def test_diff_file_to_link(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'b')
+        self.assertIsInstance(diff, string_types)
+        diff = self.repo.diff(self.rev2, self.rev1, 'b')
+        self.assertIsInstance(diff, string_types)
+
+    def test_diff_file_to_dir(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'c')
+        self.assertIsInstance(diff, string_types)
+        diff = self.repo.diff(self.rev2, self.rev1, 'c')
+        self.assertIsInstance(diff, string_types)
+
+    def test_diff_link_to_dir(self):
+        diff = self.repo.diff(self.rev1, self.rev2, 'd')
+        self.assertIsInstance(diff, string_types)
+        diff = self.repo.diff(self.rev2, self.rev1, 'd')
+        self.assertIsInstance(diff, string_types)
 
 
 ### TEST CASE: EmptyMainBranchTest ###
@@ -797,8 +884,9 @@ class BasicTest(object):
         os.mkdir(path_a)
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.rev1)
+        self.assertIsInstance(pdiff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-        p.communicate(pdiff)
+        p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
         # symlinks are not reconstructed by patch, so just make sure the file exists
         # then remove it so that diff works
@@ -819,8 +907,9 @@ class BasicTest(object):
         os.mkdir(path_a)
         self.export(self.rev1, path_b)
         pdiff = self.repo.pdiff(self.main_branch)
+        self.assertIsInstance(pdiff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-        p.communicate(pdiff)
+        p.communicate(pdiff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
         # symlinks are not reconstructed by patch, so just make sure the file exists
         # then remove it so that diff works
@@ -1039,8 +1128,8 @@ def setup_branch_test(test, step):
     yield DeleteBranch('branch1')
     test.rev[18] = test.getAbsoluteRev()
 
-### TEST CASE: BranchTestStep3 ###
 
+### TEST CASE: BranchTestStep3 ###
 
 class BranchTestStep3(object):
     @classmethod
@@ -1243,8 +1332,9 @@ class BranchTestStep7(object):
         self.export(self.main_branch, path_a)
         self.export(branch1a, path_b)
         diff = self.repo.diff(self.main_branch, branch1a)
+        self.assertIsInstance(diff, string_types)
         p = subprocess.Popen(['patch', '-p1', '-s'], cwd=path_a, stdin=subprocess.PIPE)
-        p.communicate(diff)
+        p.communicate(diff.encode(self.repo.encoding))
         self.assertEqual(0, p.returncode)
         rc = subprocess.call(['diff', '-urN', path_a, path_b])
         self.assertEqual(0, rc)
