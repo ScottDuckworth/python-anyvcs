@@ -35,6 +35,7 @@ Supported Operations
 * ``bookmarks()`` - list bookmarks (Mercurial only)
 * ``tags()`` - list tags
 * ``heads()`` - list all branches, bookmarks, tags, etc.
+* ``tip()`` - find the tip of a named head
 * ``empty()`` - determine if the repository contains any commits
 * ``__len__()`` - count the number of commits in the repository
 * ``__contains__()`` - determine if the repository contains the given revision
@@ -45,6 +46,8 @@ Supported Operations
 * ``ancestor()`` - find most recent common ancestor of any two revisions
 * ``blame()`` - blame (a.k.a. annotate) lines of a file
 * ``canonical_rev()`` - get the canonical revision identifier
+* ``compose_rev()`` - compose a revision identifier which encodes branch and revision
+* ``clone()`` - clone an existing repository
 * ``private_path`` - a path in the repository where untracked data can be stored
 * ``dump()`` - create a Subversion dumpfile (Subversion only)
 * ``load()`` - load a Subversion dumpfile (Subversion only)
