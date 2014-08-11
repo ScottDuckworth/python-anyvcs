@@ -45,7 +45,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'python-anyvcs'
-copyright = u'2013, Clemson University'
+copyright = u'2013-2014, Clemson University'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
