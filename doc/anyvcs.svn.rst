@@ -1,5 +1,5 @@
-``svn`` - Subversion concepts
-=============================
+Subversion-specific functionality
+=================================
 
 .. module:: anyvcs.svn
 

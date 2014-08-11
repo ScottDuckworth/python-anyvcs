@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Clemson University
+# Copyright (c) 2013-2014, Clemson University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -11,7 +11,7 @@
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
 #
-# * Neither the name of the {organization} nor the names of its
+# * Neither the name Clemson University nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
 #
@@ -72,6 +72,19 @@ def parse_isodate(datestr):
     return dt
 
 
+def command(cmd, input=None, **kwargs):
+    try:
+        output = subprocess.check_output(cmd, **kwargs)
+        return output
+    except AttributeError:  # subprocess.check_output added in python 2.7
+        kwargs.setdefault('stdout', subprocess.PIPE)
+        p = subprocess.Popen(cmd, **kwargs)
+        stdout, stderr = p.communicate()
+        if p.returncode != 0:
+            raise subprocess.CalledProcessError(p.returncode, cmd)
+        return stdout
+
+
 class ABCMetaDocStringInheritor(ABCMeta):
     '''A variation on
     http://groups.google.com/group/comp.lang.python/msg/26f7b4fcb4d66c95
@@ -129,6 +142,14 @@ class attrdict(dict):
 
 
 class CommitLogEntry(object):
+    """Represents a single entry in the commit log
+
+    :ivar rev: Revision name
+    :ivar parents: Parents of the revision
+    :ivar datetime date: Timestamp of the revision
+    :ivar str author: Author of the revision
+    :ivar str message: Message from committer
+    """
     def __init__(self, rev, parents, date, author, message):
         self.rev = rev
         self.parents = parents
@@ -144,6 +165,7 @@ class CommitLogEntry(object):
 
     @property
     def subject(self):
+        """First line of the commit message."""
         return self.message.split('\n', 1)[0]
 
     def to_json(self):
@@ -173,17 +195,23 @@ class CommitLogEntry(object):
 class CommitLogCache(HashDict):
     def __getitem__(self, key):
         value = HashDict.__getitem__(self, key)
-        value = CommitLogEntry.from_json(value)
+        value = CommitLogEntry.from_json(value.decode())
         if value:
             return value
         raise KeyError(key)
 
     def __setitem__(self, key, value):
-        value = value.to_json()
+        value = value.to_json().encode()
         HashDict.__setitem__(self, key, value)
 
 
 class FileChangeInfo(object):
+    """Represents a change to a single path.
+
+    :ivar str path: The path that was changed.
+    :ivar str status: VCS-specific code for the change type.
+    :ivar copy: The source path copied from, if any.
+    """
     def __init__(self, path, status, copy=None):
         self.path = path
         self.status = status
@@ -191,6 +219,13 @@ class FileChangeInfo(object):
 
 
 class BlameInfo(object):
+    """Represents an annotated line in a file for a blame view.
+
+    :ivar rev: Revision at which the line was last changed
+    :ivar str author: Author of the change
+    :ivar datetime date: Timestamp of the change
+    :ivar str line: Line data from the file.
+    """
     def __init__(self, rev, author, date, line):
         self.rev = rev
         self.author = author
@@ -260,16 +295,7 @@ class VCSRepo(object):
 
     def _command(self, cmd, input=None, **kwargs):
         kwargs.setdefault('cwd', self.path)
-        try:
-            output = subprocess.check_output(cmd, **kwargs)
-            return output
-        except AttributeError:  # subprocess.check_output added in python 2.7
-            kwargs.setdefault('stdout', subprocess.PIPE)
-            p = subprocess.Popen(cmd, **kwargs)
-            stdout, stderr = p.communicate()
-            if p.returncode != 0:
-                raise subprocess.CalledProcessError(p.returncode, cmd)
-            return stdout
+        return command(cmd, **kwargs)
 
     @classmethod
     def cleanPath(cls, path):
@@ -279,7 +305,33 @@ class VCSRepo(object):
 
     @abstractmethod
     def canonical_rev(self, rev):
-        """Get the canonical revision identifier"""
+        """ Get the canonical revision identifier
+
+        :param rev: The revision to canonicalize.
+        :returns: The canonicalized revision
+
+        The canonical revision is the revision which is natively supported by
+        the underlying VCS type. In some cases, anyvcs may annotate a revision
+        identifier to also encode branch information which is not safe to use
+        directly with the VCS itself (e.g. as created by :meth:`compose_rev`).
+        This method is a means of converting back to canonical form.
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def compose_rev(self, branch, rev):
+        """ Compose a revision identifier which encodes branch and revision.
+
+        :param str branch: A branch name
+        :param rev: A revision (can be canonical or as constructed by
+                    :meth:`compose_rev()` or :meth:`tip()`)
+
+        The revision identifier encodes branch and revision information
+        according to the particular VCS type. This is a means to unify the
+        various branching models under a common interface.
+
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -291,14 +343,14 @@ class VCSRepo(object):
 
         :param rev: The revision to use.
         :param path: The path to list. May start with a '/' or not. Directories
-                                 may end with a '/' or not.
+                     may end with a '/' or not.
         :param recursive: Recursively list files in subdirectories.
         :param recursive_dirs: Used when recursive=True, also list directories.
-        :param directory: If path is a directory, list path itself instead of its
-                                            contents.
+        :param directory: If path is a directory, list path itself instead of
+                          its contents.
         :param report: A list or tuple of extra attributes to return that may
-                                     require extra processing. Recognized values are 'size',
-                                     'target', 'executable', and 'commit'.
+                       require extra processing. Recognized values are 'size',
+                       'target', 'executable', and 'commit'.
 
         Returns a list of dictionaries with the following keys:
 
@@ -327,12 +379,11 @@ class VCSRepo(object):
         """Get file contents
 
         :param rev: The revision to use.
-        :param path: The path to the file. Must be a file.
-
-        Returns the file contents as a string.
-
-        Raises PathDoesNotExist if the path does not exist.
-        Raises BadFileType if the path is not a file.
+        :param str path: The path to the file. Must be a file.
+        :returns: The contents of the file.
+        :rtype: str or bytes
+        :raises PathDoesNotExist: If the path does not exist.
+        :raises BadFileType: If the path is not a file.
 
         """
         raise NotImplementedError
@@ -342,12 +393,10 @@ class VCSRepo(object):
         """Get symbolic link target
 
         :param rev: The revision to use.
-        :param path: The path to the file. Must be a symbolic link.
-
-        Returns the target of the symbolic link as a string.
-
-        Raises PathDoesNotExist if the path does not exist.
-        Raises BadFileType if the path is not a symbolic link.
+        :param str path: The path to the file. Must be a symbolic link.
+        :returns str: The target of the symbolic link.
+        :raises PathDoesNotExist: if the path does not exist.
+        :raises BadFileType: if the path is not a symbolic link.
 
         """
         raise NotImplementedError
@@ -355,18 +404,30 @@ class VCSRepo(object):
     @abstractmethod
     def branches(self):
         """Get list of branches
+
+        :returns: The branches in the repository
+        :rtype: list of str
+
         """
         raise NotImplementedError
 
     @abstractmethod
     def tags(self):
         """Get list of tags
+
+        :returns: The tags in the repository
+        :rtype: list of str
+
         """
         raise NotImplementedError
 
     @abstractmethod
     def heads(self):
         """Get list of heads
+
+        :returns: The heads in the repository
+        :rtype: list of str
+
         """
         raise NotImplementedError
 
@@ -374,7 +435,10 @@ class VCSRepo(object):
     def empty(self):
         """Test if the repository contains any commits
 
+        :returns bool: True if the repository contains no commits.
+
         Commits that exist by default (e.g. a zero commit) are not counted.
+
         """
         return NotImplementedError
 
@@ -399,14 +463,16 @@ class VCSRepo(object):
     ):
         """Get commit logs
 
-        :param revrange: Either a single revision or a range of revisions as a 2
-                                         element list or tuple.
-        :param limit: Limit the number of log entries.
-        :param firstparent: Only follow the first parent of merges.
-        :param merges: True means only merges, False means no merges, None means
-                                     both merges and non-merges.
-        :param path:     Only match commits containing changes on this path.
-        :param follow: Follow file history across renames.
+        :param revrange: Either a single revision or a range of revisions as a
+                         2-element list or tuple.
+        :param int limit: Limit the number of log entries.
+        :param bool firstparent: Only follow the first parent of merges.
+        :param bool merges: True means only merges, False means no merges,
+                            None means both merges and non-merges.
+        :param str path: Only match commits containing changes on this path.
+        :param bool follow: Follow file history across renames.
+        :returns: log information
+        :rtype: :class:`CommitLogEntry` or list of :class:`CommitLogEntry`
 
         If revrange is None, return a list of all log entries in reverse
         chronological order.
@@ -426,7 +492,8 @@ class VCSRepo(object):
     def changed(self, rev):
         """Files that changed from the rev's parent(s)
 
-        Returns a list of FileChangeInfo items.
+        :param rev: The revision to get the files that changed.
+        :type rev: list of :class:`FileChangeInfo`.
 
         """
         raise NotImplementedError
@@ -435,8 +502,11 @@ class VCSRepo(object):
     def pdiff(self, rev):
         """Diff from the rev's parent(s)
 
-        Returns a string containing the unified diff that the rev introduces with
-        a prefix of one (suitable for input to patch -p1).
+        :param rev: The rev to compute the diff from its parent.
+        :returns str: The diff.
+
+        The returned string is a unified diff that the rev introduces with a
+        prefix of one (suitable for input to patch -p1).
 
         """
         raise NotImplementedError
@@ -445,16 +515,24 @@ class VCSRepo(object):
     def diff(self, rev_a, rev_b, path=None):
         """Diff of two revisions
 
-        Returns a string containing the unified diff from rev_a to rev_b with a
-        prefix of one (suitable for input to patch -p1). If path is not None, only
-        return the diff for that file.
+        :param rev_a: The start revision.
+        :param rev_b: The end revision.
+        :param path: If not None, return diff for only that file.
+        :type path: None or str
+        :returns str: The diff.
 
+        The returned string contains the unified diff from rev_a to rev_b with
+        a prefix of one (suitable for input to patch -p1).
         """
         raise NotImplementedError
 
     @abstractmethod
     def ancestor(self, rev1, rev2):
         """Find most recent common ancestor of two revisions
+
+        :param rev1: First revision.
+        :param rev2: Second revision.
+        :returns: The common ancestor revision between the two.
         """
         raise NotImplementedError
 
@@ -462,10 +540,27 @@ class VCSRepo(object):
     def blame(self, rev, path):
         """Blame (a.k.a. annotate, praise) a file
 
-        Returns a list of BlameInfo objects in file order.
-
-        Raises PathDoesNotExist if the path does not exist.
-        Raises BadFileType if the path is not a file.
+        :param rev: The revision to blame.
+        :param str path: The path to blame.
+        :returns: list of annotated lines of the given path
+        :rtype: list of :class:`BlameInfo` objects
+        :raises PathDoesNotExist: if the path does not exist.
+        :raises BadFileType: if the path is not a file.
 
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def tip(self, head):
+        """Find the tip of a named head
+
+        :param str head: name of head to look up
+        :returns: revision identifier of head
+
+        The returned identifier should be a valid input for :meth:`VCSRepo.ls`.
+        and respect the branch name in the returned identifier if applicable.
+
+        """
+        raise NotImplementedError
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

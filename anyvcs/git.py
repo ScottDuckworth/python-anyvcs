@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Clemson University
+# Copyright (c) 2013-2014, Clemson University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -11,7 +11,7 @@
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
 #
-# * Neither the name of the {organization} nor the names of its
+# * Neither the name Clemson University nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
 #
@@ -39,12 +39,28 @@ rev_rx = re.compile(r'^[0-9a-f]{40}$', re.IGNORECASE)
 branch_rx = re.compile(r'^[*]?\s+(?P<name>.+)$')
 
 
+def readuntil(f, stop):
+    buf = bytes()
+    while True:
+        b = f.read(1)
+        if b == stop or not b:
+            return buf
+        buf += b
+
+
 class GitRepo(VCSRepo):
     """A git repository
 
     Valid revisions are anything that git considers as a revision.
 
     """
+
+    @classmethod
+    def clone(cls, srcpath, destpath, encoding='utf-8'):
+        """Clone an existing repository to a new bare repository."""
+        cmd = [GIT, 'clone', '--quiet', '--bare', srcpath, destpath]
+        subprocess.check_call(cmd)
+        return cls(destpath, encoding)
 
     @classmethod
     def create(cls, path, encoding='utf-8'):
@@ -70,15 +86,6 @@ class GitRepo(VCSRepo):
                 raise
         return path
 
-    @property
-    def _object_cache(self):
-        try:
-            return self._object_cache_v
-        except AttributeError:
-            object_cache_path = os.path.join(self.private_path, 'object-cache')
-            self._object_cache_v = HashDict(object_cache_path)
-            return self._object_cache_v
-
     def canonical_rev(self, rev):
         rev = str(rev)
         if rev_rx.match(rev):
@@ -87,10 +94,14 @@ class GitRepo(VCSRepo):
             cmd = [GIT, 'rev-parse', rev]
             return self._command(cmd).decode().rstrip()
 
+    def compose_rev(self, branch, rev):
+        return self.canonical_rev(rev)
+
     def ls(
         self, rev, path, recursive=False, recursive_dirs=False,
         directory=False, report=()
     ):
+        rev = self.canonical_rev(rev)
         path = type(self).cleanPath(path)
         forcedir = False
         if path.endswith('/'):
@@ -103,7 +114,7 @@ class GitRepo(VCSRepo):
             if directory:
                 entry = attrdict(path='/', type='d')
                 if 'commit' in report:
-                    entry.commit = self.canonical_rev(rev)
+                    entry.commit = rev
                 return [entry]
         else:
             epath = path.rstrip('/').encode(self.encoding)
@@ -133,11 +144,11 @@ class GitRepo(VCSRepo):
             return []
 
         results = []
+        files = {}
         for line in output.split(b'\0'):
             meta, ename = line.split(b'\t', 1)
             meta = meta.decode().split()
             mode = int(meta[0], 8)
-            objid = meta[2]
             name = ename.decode(self.encoding, 'replace')
             if recursive_dirs and path == name + '/':
                 continue
@@ -160,16 +171,29 @@ class GitRepo(VCSRepo):
                     entry.target = self._cat(rev, ename).decode(self.encoding, 'replace')
             else:
                 assert False, 'unexpected output: ' + str(line)
-            if 'commit' in report:
-                try:
-                    entry.commit = self._object_cache[objid]
-                    entry._commit_cached = True
-                except KeyError:
-                    ename = name.encode(self.encoding)
-                    cmd = [GIT, 'log', '--pretty=format:%H', '-1', rev, '--', ename]
-                    commit = self._command(cmd).decode()
-                    entry.commit = self._object_cache[objid] = commit
             results.append(entry)
+            files[ename] = entry
+
+        if 'commit' in report:
+            cmd = [GIT, 'log', '--pretty=format:%H', '--name-only', '-m', '--first-parent', '-z', rev]
+            p = subprocess.Popen(cmd, cwd=self.path, stdout=subprocess.PIPE)
+            commit = readuntil(p.stdout, b'\n').rstrip().split(b'\0')[-1]
+            while commit and files:
+                while True:
+                    f = readuntil(p.stdout, b'\0')
+                    if f == b'':
+                        commit = readuntil(p.stdout, b'\n').split(b'\0')[-1]
+                        break
+                    if not recursive:
+                        d = f[len(path):].find(b'/')
+                        if d != -1:
+                            f = f[:len(path) + d]
+                    if f in files:
+                        files[f].commit = commit.decode()
+                        del files[f]
+            p.stdout.close()
+            p.terminate()
+            p.wait()
 
         return results
 
@@ -215,7 +239,7 @@ class GitRepo(VCSRepo):
         return self.branches() + self.tags()
 
     def empty(self):
-        cmd = [GIT, 'rev-parse', 'HEAD']
+        cmd = [GIT, 'rev-list', '-n1', '--all']
         p = subprocess.Popen(
             cmd, cwd=self.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
@@ -272,11 +296,12 @@ class GitRepo(VCSRepo):
                 else:
                     cmd.append(revrange[0] + '..' + revrange[1])
         else:
-            entry = self._commit_cache.get(self.canonical_rev(revrange))
+            rev = self.canonical_rev(revrange)
+            entry = self._commit_cache.get(rev)
             if entry:
                 entry._cached = True
                 return entry
-            cmd.extend(['-1', revrange])
+            cmd.extend(['-1', rev])
             single = True
         if path:
             if follow:
@@ -298,10 +323,10 @@ class GitRepo(VCSRepo):
         return results
 
     def changed(self, rev):
-        cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--first-parent', '--root', rev]
+        cmd = [GIT, 'diff-tree', '-z', '-C', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
         output = self._command(cmd)
         results = []
-        for line in output.rstrip(b'\0').split(b'\0:')[1:]:
+        for line in output.rstrip(b'\0').split(b'\0:'):
             path = line.split(b'\0')
             meta = path.pop(0).split()
             status = meta[3].decode()[0]
@@ -315,14 +340,14 @@ class GitRepo(VCSRepo):
         return results
 
     def pdiff(self, rev):
-        cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--first-parent', '--root', rev]
-        return self._command(cmd)
+        cmd = [GIT, 'diff-tree', '-p', '-r', '-m', '--no-commit-id', '--first-parent', '--root', rev]
+        return self._command(cmd).decode(self.encoding)
 
     def diff(self, rev_a, rev_b, path=None):
         cmd = [GIT, 'diff', rev_a, rev_b]
         if path is not None:
             cmd.extend(['--', type(self).cleanPath(path)])
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def ancestor(self, rev1, rev2):
         cmd = [GIT, 'merge-base', rev1, rev2]
@@ -364,3 +389,8 @@ class GitRepo(VCSRepo):
                 else:
                     revinfo.setdefault(rev, {})[k] = v
         return results
+
+    def tip(self, head):
+        return self.canonical_rev(head)
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

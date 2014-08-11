@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Clemson University
+# Copyright (c) 2013-2014, Clemson University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -11,7 +11,7 @@
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
 #
-# * Neither the name of the {organization} nor the names of its
+# * Neither the name Clemson University nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
 #
@@ -56,7 +56,7 @@ class HashDict(collections.MutableMapping):
         int(key, 16)
         p = os.path.join(self.path, key[:2], key[2:])
         try:
-            with open(p, 'r') as f:
+            with open(p, 'rb') as f:
                 fcntl.lockf(f, fcntl.LOCK_SH)
                 return f.read()
         except IOError as e:
@@ -73,17 +73,10 @@ class HashDict(collections.MutableMapping):
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        fd = None
-        try:
-            fd = os.open(p, os.O_WRONLY | os.O_CREAT, self.mode)
-            fcntl.lockf(fd, fcntl.LOCK_EX)
-            os.ftruncate(fd, 0)
-            with os.fdopen(fd, 'w') as f:
-                fd = None
-                f.write(value)
-        finally:
-            if fd is not None:
-                os.close(fd)
+        with open(p, 'ab+', self.mode) as f:
+            fcntl.lockf(f, fcntl.LOCK_EX)
+            os.ftruncate(f.fileno(), 0)
+            f.write(value)
 
     def __delitem__(self, key):
         int(key, 16)
@@ -113,3 +106,5 @@ class HashDict(collections.MutableMapping):
 
     def __len__(self):
         return len(list(self.__iter__()))
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:

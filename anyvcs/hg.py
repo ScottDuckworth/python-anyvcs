@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Clemson University
+# Copyright (c) 2013-2014, Clemson University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -11,7 +11,7 @@
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
 #
-# * Neither the name of the {organization} nor the names of its
+# * Neither the name Clemson University nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
 #
@@ -30,6 +30,7 @@ import datetime
 import os
 import re
 import subprocess
+import errno
 from .common import *
 
 HG = 'hg'
@@ -37,7 +38,7 @@ HG = 'hg'
 canonical_rev_rx = re.compile(r'^[0-9a-f]{40}$')
 manifest_rx = re.compile(r'^(?P<object>[0-9a-f]{40}) (?P<mode>[0-7]{3}) (?P<type>.) (?P<name>.+)$')
 parse_heads_rx = re.compile(r'^(?P<name>.+?)\s+(?P<rev>-?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
-bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>\d+):(?P<nodeid>[0-9a-f]+)', re.I)
+bookmarks_rx = re.compile(r'^\s+(?:\*\s+)?(?P<name>.+?)\s+(?P<rev>[-]?\d+):(?P<nodeid>[0-9a-f]+)', re.I)
 annotate_rx = re.compile(r'^(?P<author>.*)\s+(?P<rev>\d+):\s')
 
 
@@ -62,6 +63,19 @@ class HgRepo(VCSRepo):
     """
 
     @classmethod
+    def clone(cls, srcpath, destpath):
+        """Clone an existing repository to a new bare repository."""
+        # Mercurial will not create intermediate directories for clones.
+        try:
+            os.makedirs(destpath)
+        except OSError as e:
+            if not e.errno == errno.EEXIST:
+                raise
+        cmd = [HG, 'clone', '--quiet', '--noupdate', srcpath, destpath]
+        subprocess.check_call(cmd)
+        return cls(destpath)
+
+    @classmethod
     def create(cls, path):
         """Create a new repository"""
         cmd = [HG, 'init', path]
@@ -80,7 +94,6 @@ class HgRepo(VCSRepo):
         try:
             os.mkdir(path)
         except OSError as e:
-            import errno
             if e.errno != errno.EEXIST:
                 raise
         return path
@@ -100,6 +113,9 @@ class HgRepo(VCSRepo):
         else:
             cmd = [HG, 'log', '--template={node}', '-r', str(rev)]
             return self._command(cmd).decode()
+
+    def compose_rev(self, branch, rev):
+        return self.canonical_rev(rev)
 
     def _revnum(self, rev):
         if isinstance(rev, int):
@@ -213,7 +229,7 @@ class HgRepo(VCSRepo):
                 if 'executable' in report:
                     entry.executable = t == '*'
                 if 'size' in report:
-                    entry.size = len(self._cat(revstr, name))
+                    entry.size = len(self._cat(revstr, fullpath))
             elif t == '@':
                 entry.type = 'l'
                 if 'target' in report:
@@ -224,13 +240,19 @@ class HgRepo(VCSRepo):
                 lookup = True
                 if objid:
                     try:
-                        entry.commit = self._object_cache[objid]
+                        import hashlib
+                        concat = (fullpath + objid).encode(self.encoding)
+                        k = hashlib.sha1(concat).hexdigest()
+                        entry.commit = self._object_cache[k].decode()
                         entry._commit_cached = True
                         lookup = False
                     except KeyError:
                         pass
                 if lookup:
-                    p = type(self).cleanPath(path + '/' + name)
+                    if name:
+                        p = type(self).cleanPath(path + '/' + name)
+                    else:
+                        p = path
                     lookup_commit[p] = (entry, objid)
             results.append(entry)
 
@@ -259,7 +281,10 @@ class HgRepo(VCSRepo):
                             entry, objid = lookup_commit[p]
                             entry.commit = commit
                             if objid:
-                                self._object_cache[objid] = commit
+                                import hashlib
+                                concat = (p + objid).encode(self.encoding)
+                                k = hashlib.sha1(concat).hexdigest()
+                                self._object_cache[k] = commit.encode()
                             del lookup_commit[p]
                             break
 
@@ -419,13 +444,13 @@ class HgRepo(VCSRepo):
 
     def pdiff(self, rev):
         cmd = [HG, 'log', '--template=a', '-p', '-r', str(rev)]
-        return self._command(cmd)[1:]
+        return self._command(cmd)[1:].decode(self.encoding)
 
     def diff(self, rev_a, rev_b, path=None):
         cmd = [HG, 'diff', '-r', rev_a, '-r', rev_b]
         if path is not None:
             cmd.extend(['--', type(self).cleanPath(path)])
-        return self._command(cmd)
+        return self._command(cmd).decode(self.encoding)
 
     def ancestor(self, rev1, rev2):
         cmd = [HG, 'log', '--template={node}', '-r', 'ancestor(%s, %s)' % (rev1, rev2)]
@@ -463,3 +488,8 @@ class HgRepo(VCSRepo):
         if ls[0].get('type') != 'f':
             raise BadFileType(rev, path)
         return self._blame(str(rev), path)
+
+    def tip(self, head):
+        return self.canonical_rev(head)
+
+# vi:set tabstop=4 softtabstop=4 shiftwidth=4 expandtab:
