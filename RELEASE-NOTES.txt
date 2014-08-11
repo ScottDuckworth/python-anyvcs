@@ -1,6 +1,24 @@
 Release Notes for python-anyvcs
 ===============================
 
+1.4.0 (2014-08-11)
+------------------
+
+* Add tip(), compose_rev(), and clone() methods
+* Add clone() and probe() functions
+* Many additions and improvements to test cases
+* Multiple bug fixes and improvements to commit caching
+* Make SvnRepo.diff() with a single path work much faster
+* Fix encoding errors for python 3
+* Bug fix: make GitRepo.empty() work correctly when there is no master branch
+* Switch to tox and py.test for unit tests
+
+1.3.1 (2014-01-21)
+------------------
+
+* Reorganize Sphinx documentation
+* PEP8 indentation fixes
+
 1.3.0 (2013-12-19)
 ------------------
 
