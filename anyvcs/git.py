@@ -327,6 +327,8 @@ class GitRepo(VCSRepo):
         output = self._command(cmd)
         results = []
         for line in output.rstrip(b'\0').split(b'\0:'):
+            if not line:
+                continue
             path = line.split(b'\0')
             meta = path.pop(0).split()
             status = meta[3].decode()[0]
