@@ -237,6 +237,20 @@ class Commit(Action):
         test.check_call(['svn', 'update'])
 
 
+class EmptyCommit(Commit):
+    """Commit without add and with empty commits allowed."""
+
+    def doGit(self, test):
+        test.check_call(['git', 'commit', '--allow-empty', '-m', self.message])
+        test.check_call(['git', 'push', '--set-upstream', 'origin', test.working_head])
+        time.sleep(1)  # git has a 1 second granularity, this keeps logs in order
+
+    def doHg(self, test):
+        raise NotImplementedError
+
+    def doSvn(self, test):
+        raise NotImplementedError
+
 class BranchAction(Action):
     def __init__(self, name):
         self.name = name
@@ -1874,6 +1888,35 @@ class CopyTest(object):
         result = self.repo.ls(self.working_head, '/revert',
                               report=['commit'])[0].commit
         self.assertEqual(self.rev5, result)
+
+
+### TEST CASE: EmptyCommitTest ###
+
+
+class EmptyCommitTest(object):
+    @classmethod
+    def setUpWorkingCopy(cls, working_path):
+        touch(os.path.join(working_path, 'dogs.txt'), 'Marley')
+        yield Commit('Add list of dogs')
+        cls.rev1 = cls.getAbsoluteRev()
+        yield EmptyCommit('Do nothing')
+        cls.rev2 = cls.getAbsoluteRev()
+
+    def test_changed1(self):
+        result = [f.path for f in self.repo.changed(self.rev1)]
+        expected = ['dogs.txt']
+        self.assertEqual(expected, result)
+
+    def test_changed2(self):
+        result = [f.path for f in self.repo.changed(self.rev2)]
+        expected = []
+        self.assertEqual(expected, result)
+
+    def test_pdiff(self):
+        result = self.repo.pdiff(self.rev2)
+        expected = ''
+        self.assertIsInstance(expected, string_types)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':
