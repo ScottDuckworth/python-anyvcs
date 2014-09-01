@@ -162,5 +162,9 @@ class GitCopyTest(GitTest, common.CopyTest):
     pass
 
 
+class GitEmptyCommitTest(GitTest, common.EmptyCommitTest):
+    pass
+
+
 if __name__ == "__main__":
     common.unittest.main()
